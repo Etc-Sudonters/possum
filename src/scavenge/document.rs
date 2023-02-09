@@ -1,5 +1,5 @@
 pub struct DocumentPointer(u64);
-pub struct DocumentPosition(u64, u64);
+pub struct DocumentPosition(usize, usize);
 
 pub struct Document {
     lines: Vec<Vec<u8>>,
