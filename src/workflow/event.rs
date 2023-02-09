@@ -1,45 +1,103 @@
+use std::cmp::{Eq, PartialEq};
+use std::collections::HashSet;
+use std::hash::Hash;
 use std::str::FromStr;
 use std::string::ToString;
 
+#[derive(Eq, PartialEq, Hash, Debug)]
+pub struct ActivityType(&'static str);
+type ActivityTypes = HashSet<ActivityType>;
+
+#[derive(Debug)]
+pub enum Schedule {
+    Cron(String),
+}
+
+#[derive(Debug)]
+pub struct PullRequest {
+    branches: Vec<String>,
+    ignored_branches: Vec<String>,
+    paths: Vec<String>,
+    ignored_paths: Vec<String>,
+    types: ActivityTypes,
+}
+
+#[derive(Debug)]
+pub struct Push {
+    branches: Vec<String>,
+    ignored_branches: Vec<String>,
+    paths: Vec<String>,
+    ignored_paths: Vec<String>,
+    tags: Vec<String>,
+    ignored_tags: Vec<String>,
+}
+#[derive(Debug)]
+pub struct WorkflowCall {}
+#[derive(Debug)]
+pub struct WorkflowDispatch {}
+#[derive(Debug)]
+pub struct WorkflowRun {}
+
+trait TryDefault: Sized {
+    type Error;
+
+    fn try_default() -> Result<Self, Self::Error>;
+}
+
 #[derive(Debug)]
 pub enum Event {
-    BranchProtectionRule,
-    CheckRun,
-    CheckSuite,
+    BranchProtectionRule(ActivityTypes),
+    CheckRun(ActivityTypes),
+    CheckSuite(ActivityTypes),
     Create,
     Delete,
     Deployment,
     DeploymentStatus,
-    Discussion,
-    DiscussionComment,
+    Discussion(ActivityTypes),
+    DiscussionComment(ActivityTypes),
     Fork,
     Gollum,
-    IssueComment,
-    Issues,
-    Label,
-    MergeGroup,
-    Milestone,
+    IssueComment(ActivityTypes),
+    Issues(ActivityTypes),
+    Label(ActivityTypes),
+    MergeGroup(ActivityTypes),
+    Milestone(ActivityTypes),
     PageBuild,
-    Project,
-    ProjectCard,
-    ProjectColumn,
+    Project(ActivityTypes),
+    ProjectCard(ActivityTypes),
+    ProjectColumn(ActivityTypes),
     Public,
-    PullRequest,
+    PullRequest(PullRequest),
     PullRequestComment,
-    PullRequestReview,
-    PullRequestReviewComment,
-    PullRequestTarget,
-    Push,
-    RegistryPackage,
-    Release,
-    RepositoryDispatch,
+    PullRequestReview(ActivityTypes),
+    PullRequestReviewComment(ActivityTypes),
+    PullRequestTarget(PullRequest),
+    Push(Push),
+    RegistryPackage(ActivityTypes),
+    Release(ActivityTypes),
+    RepositoryDispatch(ActivityTypes),
     Schedule,
     Status,
-    Watch,
-    WorkflowCall,
-    WorkflowDispatch,
-    WorkflowRun,
+    Watch(ActivityTypes),
+    WorkflowCall(WorkflowCall),
+    WorkflowDispatch(WorkflowDispatch),
+    WorkflowRun(WorkflowRun),
     Unknown(String),
+}
+
+impl Event {
+    pub fn accept_activity(&mut self, activity: ActivityType) -> Result<(), WorkflowEventError> {
+        if self.accepted_activities().contains(&activity) {
+            return Ok(());
+        }
+        return Err(WorkflowEventError);
+    }
+
+    fn accepted_activities(&self) -> HashSet<ActivityType> {
+        match self {
+            _ => HashSet::new(),
+        }
+    }
 }
 
 pub struct WorkflowEventError;
