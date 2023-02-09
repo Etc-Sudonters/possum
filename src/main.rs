@@ -51,8 +51,8 @@
  */
 #![allow(dead_code, unused_variables)]
 mod cli;
+mod document;
 mod scavenge;
-mod workflow;
 use clap::Parser;
 use std::collections::HashMap;
 use std::fs::File;

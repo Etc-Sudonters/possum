@@ -6,7 +6,7 @@ use yaml_peg::parser::Loader;
 use yaml_peg::repr::{RcRepr, Repr};
 use yaml_peg::{Node, Yaml};
 
-use super::visitor::{self, ParserVisitor};
+use super::visitor::{self, WorkflowVisitor};
 
 #[derive(Debug)]
 pub enum Error {
@@ -45,19 +45,13 @@ impl<R: Repr> WorkflowBuilderVisitor<R> {
     }
 }
 
-impl<R> visitor::ParserVisitor<R> for WorkflowBuilderVisitor<R>
+impl<R> visitor::WorkflowVisitor<R> for WorkflowBuilderVisitor<R>
 where
     R: Repr,
 {
     fn visit_on_str(&mut self, on: &str) {
         if let Ok(evt) = workflow::Event::from_str(on) {
             self.builder.responds_to(evt)
-        }
-    }
-
-    fn visit_on_seq(&mut self, on: &yaml_peg::Seq<R>) {
-        for node in on.iter() {
-            self.visit_on(node);
         }
     }
 
