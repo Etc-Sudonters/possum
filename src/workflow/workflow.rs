@@ -1,14 +1,36 @@
-use super::{base, job, triggers};
-use serde::{Deserialize, Serialize};
+use super::event;
 use std::collections::HashMap;
+use std::convert::TryInto;
 
-#[derive(Serialize, Debug, Deserialize)]
+pub struct Builder {
+    events: HashMap<String, event::Event>,
+}
+
+#[derive(Debug)]
 pub struct Workflow {
-    on: triggers::On,
-    name: String,
-    run_name: Option<base::Expression>,
-    env: Option<base::Env>,
-    defaults: Option<base::Defaults>,
-    concurrency: Option<base::Concurrency>,
-    jobs: HashMap<String, job::Job>,
+    events: HashMap<String, event::Event>,
+}
+
+pub struct WorkflowConstructionError;
+
+impl TryInto<Workflow> for Builder {
+    type Error = WorkflowConstructionError;
+
+    fn try_into(self) -> Result<Workflow, Self::Error> {
+        Ok(Workflow {
+            events: self.events,
+        })
+    }
+}
+
+impl Builder {
+    pub fn new() -> Builder {
+        Builder {
+            events: HashMap::new(),
+        }
+    }
+
+    pub fn responds_to(&mut self, event: event::Event) {
+        self.events.insert(event.to_string(), event);
+    }
 }

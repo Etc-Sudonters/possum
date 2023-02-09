@@ -7,5 +7,8 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.1.4", features = ["derive"] }
-serde = { version = "1.0.152", features = ["derive"] }
-serde_yaml = "0.9.17"
+thiserror = "1.0.38"
+yaml-peg = "1.0.5"
+
+[dependencies.yaml-rust]
+git = "https://github.com/chyh1990/yaml-rust.git"
