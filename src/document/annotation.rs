@@ -1,6 +1,18 @@
 use super::document::DocumentPointer;
 use std::convert::AsRef;
 
+pub struct Annotations(Vec<Annotation>);
+
+impl Annotations {
+    pub fn new() -> Annotations {
+        Annotations(Vec::with_capacity(16))
+    }
+
+    pub fn add(&mut self, a: Annotation) {
+        self.0.push(a)
+    }
+}
+
 pub enum AnnotationLevel {
     Info,
     Warn,
@@ -15,27 +27,27 @@ impl Annotation {
         Annotation(level, msg.to_owned(), pointer.clone())
     }
 
-    pub fn Info<P>(pointer: P, msg: &str) -> Annotation
+    pub fn info<P>(pointer: P, msg: &str) -> Annotation
     where
         P: AsRef<DocumentPointer>,
     {
         Annotation::from_parts(AnnotationLevel::Info, msg, pointer.as_ref())
     }
 
-    pub fn Warn<P>(pointer: P, msg: &str) -> Annotation
+    pub fn warn<P>(pointer: P, msg: &str) -> Annotation
     where
         P: AsRef<DocumentPointer>,
     {
         Annotation::from_parts(AnnotationLevel::Warn, msg, pointer.as_ref())
     }
-    pub fn Error<P>(pointer: P, msg: &str) -> Annotation
+    pub fn error<P>(pointer: P, msg: &str) -> Annotation
     where
         P: AsRef<DocumentPointer>,
     {
         Annotation::from_parts(AnnotationLevel::Error, msg, pointer.as_ref())
     }
 
-    pub fn Fatal<P>(pointer: P, msg: &str) -> Annotation
+    pub fn fatal<P>(pointer: P, msg: &str) -> Annotation
     where
         P: AsRef<DocumentPointer>,
     {

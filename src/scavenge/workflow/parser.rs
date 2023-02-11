@@ -1,31 +1,38 @@
-use crate::document::Annotation;
-use std::convert::Into;
-use yaml_peg::{parser, repr::Repr};
+use std::marker::PhantomData;
 
-use super::visitor::WorkflowVisitor;
-use crate::workflow::Builder as WorkflowBuilder;
+use yaml_peg::repr::Repr;
+
+use crate::document::{Annotation, Annotations};
+
+use super::ast;
+use super::ast::{job, on};
 
 pub enum ParseFailure {
     TooManyDocuments(u8),
 }
 
-pub struct ParseResult<T> {
-    result: Option<T>,
-    annotations: Vec<Annotation>,
-}
-
-struct Parser {
-    b: WorkflowBuilder,
-    annos: Vec<Annotation>,
-}
-
-pub fn parse<'a, T, V, R, L>(
-    loader: &parser::Loader<'a, R>,
-    visitor: V,
-) -> Result<ParseResult<T>, ParseFailure>
+pub struct WorkflowParser<'a, R>
 where
     R: Repr,
-    V: WorkflowVisitor + Into<T>,
 {
-    todo!()
+    _x: &'a PhantomData<R>,
+    annotations: Annotations,
+}
+
+impl<'a, R> WorkflowParser<'a, R>
+where
+    R: Repr,
+{
+    pub fn parse(&mut self, n: &'a yaml_peg::Map<R>) {
+        for (k, v) in n.iter() {}
+    }
+
+    fn annotation(&mut self, a: Annotation) {
+        self.annotations.add(a)
+    }
+
+    fn visit_name(&mut self, n: &'a ast::Node<String>) {}
+    fn visit_run_name(&mut self, n: &'a ast::Node<String>) {}
+    fn visit_on(&mut self, n: &'a ast::Node<on::Trigger>) {}
+    fn visit_job(&mut self, n: &'a ast::Node<job::Job>) {}
 }

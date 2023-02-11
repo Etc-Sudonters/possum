@@ -1,8 +1,9 @@
+mod builder;
 #[macro_use]
 mod core;
-mod job;
-mod on;
-use self::core::*;
+pub mod job;
+pub mod on;
+pub use self::core::*;
 
 node! {
     struct Workflow {
