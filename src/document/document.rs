@@ -1,4 +1,6 @@
-pub struct DocumentPointer(u64);
+#[derive(Debug, Copy, Clone)]
+pub struct DocumentPointer(pub(crate) u64);
+
 pub struct DocumentPosition(usize, usize);
 
 pub struct Document {
@@ -12,8 +14,5 @@ impl Document {
             lines: vec![],
             total_length: 0,
         }
-    }
-    pub fn pos_at(self: &Self, p: &DocumentPointer) -> Result<DocumentPosition, ()> {
-        todo!();
     }
 }

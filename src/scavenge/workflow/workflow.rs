@@ -1,18 +1,24 @@
+use crate::document::DocumentPointer;
+use std::collections::HashMap;
 use std::convert::AsRef;
 
+pub type MarkedMap<'a, T> = HashMap<MString<'a>, T>;
 pub type MString<'a> = Marked<&'a str>;
 pub type KVP<'a> = (MString<'a>, MString<'a>);
+
+pub struct NamedNode<'a, T> {
+    name: MString<'a>,
+    children: Vec<T>,
+}
+
 pub struct Marked<T> {
     value: T,
-    raw_document_pointer: u64,
+    pointer: DocumentPointer,
 }
 
 impl<T> Marked<T> {
-    pub fn new(inner: T, document_pointer: u64) -> Marked<T> {
-        Marked {
-            value: inner,
-            raw_document_pointer: document_pointer,
-        }
+    pub fn new(value: T, pointer: DocumentPointer) -> Marked<T> {
+        Marked { value, pointer }
     }
 }
 
@@ -22,17 +28,20 @@ impl<T> AsRef<T> for Marked<T> {
     }
 }
 
-pub struct Invalid {}
 pub enum Workflow<'a> {
     Name(MString<'a>),
     RunName(MString<'a>),
     On(Event<'a>),
-    Env(Vec<KVP<'a>>),
+    Env(MarkedMap<'a, MString<'a>>),
     Defaults(Defaults<'a>),
     Concurrency(Concurrency<'a>),
-    Jobs(Vec<(MString<'a>, Vec<Job<'a>>)>),
-    Invalid(Marked<Invalid>),
+    Jobs(Vec<JobNode<'a>>),
     Permission(Permission<'a>),
+}
+
+pub struct JobNode<'a> {
+    pub(super) name: MString<'a>,
+    pub(super) children: Vec<Job<'a>>,
 }
 
 pub enum Job<'a> {
@@ -40,22 +49,33 @@ pub enum Job<'a> {
     Container(Vec<JobContainer<'a>>),
     ContinueOnError(MString<'a>),
     Defaults(Defaults<'a>),
-    Env(Vec<KVP<'a>>),
+    Env(MarkedMap<'a, MString<'a>>),
     Environment(Environment<'a>),
     If(MString<'a>),
     Name(MString<'a>),
     Needs(Vec<MString<'a>>),
-    Outputs(Vec<KVP<'a>>),
+    Outputs(MarkedMap<'a, MString<'a>>),
     Permissions(Permission<'a>),
     RunsOn(Vec<MString<'a>>),
     Secrets(PassedSecret<'a>),
-    Services(Vec<Vec<JobService<'a>>>),
-    Steps(Vec<Vec<Step<'a>>>),
+    Services(Vec<JobServiceNode<'a>>),
+    Steps(Vec<StepNode<'a>>),
     Strategy(Strategy<'a>),
     TimeoutMinutes(MString<'a>),
     Uses(MString<'a>),
-    With(Vec<KVP<'a>>),
+    With(MarkedMap<'a, MString<'a>>),
 }
+
+pub struct StepNode<'a> {
+    children: Vec<Step<'a>>,
+    idx: usize,
+}
+
+pub struct JobServiceNode<'a> {
+    children: Vec<JobService<'a>>,
+    idx: usize,
+}
+
 pub enum PassedSecret<'a> {
     Inherit,
     Explicit(Vec<KVP<'a>>),
@@ -63,7 +83,7 @@ pub enum PassedSecret<'a> {
 pub enum JobService<'a> {
     Image(MString<'a>),
     Credentials(Vec<ContainerCreds<'a>>),
-    Env(Vec<KVP<'a>>),
+    Env(MarkedMap<'a, MString<'a>>),
     Ports(Vec<MString<'a>>),
     Volumes(Vec<MString<'a>>),
     Options(Vec<MString<'a>>),
@@ -71,7 +91,7 @@ pub enum JobService<'a> {
 pub enum JobContainer<'a> {
     Image(MString<'a>),
     Credentials(Vec<ContainerCreds<'a>>),
-    Env(Vec<KVP<'a>>),
+    Env(MarkedMap<'a, MString<'a>>),
     Ports(Vec<MString<'a>>), // ??
     Volumes(Vec<MString<'a>>),
     Options(Vec<MString<'a>>), //?
@@ -100,12 +120,12 @@ pub enum Step<'a> {
     Uses(MString<'a>),
     Run(MString<'a>),
     Shell(MString<'a>),
-    Env(Vec<KVP<'a>>),
+    Env(MarkedMap<'a, MString<'a>>),
     With(StepWith<'a>),
 }
 
 pub enum StepWith<'a> {
-    Envish(Vec<KVP<'a>>),
+    Envish(MarkedMap<'a, MString<'a>>),
     Container(Vec<ContainerWith<'a>>),
 }
 
@@ -143,13 +163,13 @@ pub enum Runs<'a> {
 pub enum Permission<'a> {
     GlobalGrant(MString<'a>),
     GlobalRevoke,
-    InvididualGrant(Vec<(MString<'a>, MString<'a>)>),
+    InvididualGrant(MarkedMap<'a, MString<'a>>),
 }
 
 pub enum Event<'a> {
     Bare(MString<'a>),
     Array(Vec<MString<'a>>),
-    Configured(Vec<(MString<'a>, Vec<EventConfiguration<'a>>)>),
+    Configured(Vec<NamedNode<'a, EventConfiguration<'a>>>),
 }
 
 pub enum EventConfiguration<'a> {
@@ -160,13 +180,13 @@ pub enum EventConfiguration<'a> {
     Tags(Vec<MString<'a>>),
     TagsIgnore(Vec<MString<'a>>),
     Schedule(Vec<Marked<Schedule<'a>>>),
-    Inputs(Vec<(MString<'a>, Vec<Input<'a>>)>),
-    InheritedSecrets(Vec<(MString<'a>, Vec<InheritedSecret<'a>>)>),
-    Outputs(Vec<(MString<'a>, Vec<WorkflowOutput<'a>>)>),
+    Inputs(Vec<NamedNode<'a, Input<'a>>>),
+    InheritedSecrets(Vec<NamedNode<'a, WorkflowInheritedSecret<'a>>>),
+    Outputs(Vec<NamedNode<'a, WorkflowOutput<'a>>>),
     Workflows(Vec<MString<'a>>),
 }
 
-pub enum InheritedSecret<'a> {
+pub enum WorkflowInheritedSecret<'a> {
     Required(MString<'a>),
 }
 

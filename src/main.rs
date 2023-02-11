@@ -50,15 +50,16 @@
  * possum search/rummage <directory | .>
  */
 #![allow(dead_code, unused_variables)]
+mod action;
 mod cli;
 mod document;
+mod project;
 mod scavenge;
+mod workflow;
 use clap::Parser;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::path::PathBuf;
 
 fn main() {
     let mut args = cli::Arguments::parse();
@@ -69,8 +70,6 @@ fn main() {
 
     assert!(args.directory.exists());
     assert!(args.directory.is_dir());
-
-    let mut workflows: HashMap<PathBuf, workflow::Workflow> = HashMap::new();
 
     for p in args.directory.read_dir().unwrap() {
         let p = p.unwrap().path();
@@ -87,17 +86,9 @@ fn main() {
                 reader
                     .read_to_string(&mut contents)
                     .expect("whoops couldn't read that file");
-                match scavenge::parse_workflow(contents.as_bytes()) {
-                    Ok(wf) => {
-                        workflows.insert(p, wf);
-                    }
-                    Err(s) => println!("failure in {} lmao: {:#?}", p.display(), s),
-                }
             }
         } else {
             continue;
         }
     }
-
-    println!("{:#?}", workflows);
 }
