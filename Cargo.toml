@@ -9,6 +9,8 @@ edition = "2021"
 clap = { version = "4.1.4", features = ["derive"] }
 thiserror = "1.0.38"
 yaml-peg = "1.0.5"
+strum_macros = "0.24"
+strum = { version = "0.24", features = ["derive"] }
 
 [dependencies.yaml-rust]
 git = "https://github.com/chyh1990/yaml-rust.git"
