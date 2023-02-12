@@ -30,7 +30,7 @@ macro_rules! node {
         )*
         }
     } => {
-        $(#[$outer:meta])*
+        $(#[$outer])*
         pub struct $name {
         $(
             $(#[$inner $(args)*])*

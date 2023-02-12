@@ -1,5 +1,4 @@
 use super::document::DocumentPointer;
-use std::convert::AsRef;
 
 pub struct Annotations(Vec<Annotation>);
 
@@ -23,34 +22,23 @@ pub enum AnnotationLevel {
 pub struct Annotation(AnnotationLevel, String, DocumentPointer);
 
 impl Annotation {
-    fn from_parts(level: AnnotationLevel, msg: &str, pointer: &DocumentPointer) -> Annotation {
-        Annotation(level, msg.to_owned(), pointer.clone())
+    fn from_parts(level: AnnotationLevel, msg: &str, pointer: DocumentPointer) -> Annotation {
+        Annotation(level, msg.to_owned(), pointer)
     }
 
-    pub fn info<P>(pointer: P, msg: &str) -> Annotation
-    where
-        P: AsRef<DocumentPointer>,
-    {
-        Annotation::from_parts(AnnotationLevel::Info, msg, pointer.as_ref())
+    pub fn info(pointer: DocumentPointer, msg: &str) -> Annotation {
+        Annotation::from_parts(AnnotationLevel::Info, msg, pointer)
     }
 
-    pub fn warn<P>(pointer: P, msg: &str) -> Annotation
-    where
-        P: AsRef<DocumentPointer>,
-    {
-        Annotation::from_parts(AnnotationLevel::Warn, msg, pointer.as_ref())
-    }
-    pub fn error<P>(pointer: P, msg: &str) -> Annotation
-    where
-        P: AsRef<DocumentPointer>,
-    {
-        Annotation::from_parts(AnnotationLevel::Error, msg, pointer.as_ref())
+    pub fn warn(pointer: DocumentPointer, msg: &str) -> Annotation {
+        Annotation::from_parts(AnnotationLevel::Warn, msg, pointer)
     }
 
-    pub fn fatal<P>(pointer: P, msg: &str) -> Annotation
-    where
-        P: AsRef<DocumentPointer>,
-    {
-        Annotation::from_parts(AnnotationLevel::Fatal, msg, pointer.as_ref())
+    pub fn error(pointer: DocumentPointer, msg: &str) -> Annotation {
+        Annotation::from_parts(AnnotationLevel::Error, msg, pointer)
+    }
+
+    pub fn fatal(pointer: DocumentPointer, msg: &str) -> Annotation {
+        Annotation::from_parts(AnnotationLevel::Fatal, msg, pointer)
     }
 }

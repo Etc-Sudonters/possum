@@ -1,11 +1,13 @@
 mod builder;
 #[macro_use]
-mod core;
+pub mod core;
 pub mod job;
 pub mod on;
 pub use self::core::*;
+use std::default::Default;
 
 node! {
+    #[derive(Default)]
     struct Workflow {
         name: String,
         run_name: String,

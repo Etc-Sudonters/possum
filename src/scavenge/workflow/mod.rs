@@ -1,4 +1,5 @@
 mod ast;
 mod parser;
 mod visitor;
-mod workflow;
+
+pub use self::parser::parse;
