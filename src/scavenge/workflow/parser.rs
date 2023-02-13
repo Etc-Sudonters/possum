@@ -1,7 +1,7 @@
 use strum::Display;
 
 use yaml_peg::repr::Repr;
-use yaml_peg::{Map, Node as YamlNode, Yaml};
+use yaml_peg::{Map, Node as YamlNode};
 
 use super::Workflow;
 use crate::document::DocumentPointer;
@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 
 pub struct WorkflowParser<'a, R>
 where
-    R: Repr,
+    R: Repr + 'a,
 {
     _x: PhantomData<R>,
     annotations: &'a mut Annotations,
@@ -20,19 +20,12 @@ where
 
 impl<'a, R> Parser<'a, R, Workflow> for WorkflowParser<'a, R>
 where
-    R: Repr,
+    R: Repr + 'a,
 {
-    fn parse(mut self, root: &'a YamlNode<R>) -> Result<Workflow, ParseFailure>
-    where
-        R: Repr,
-    {
-        match root.yaml() {
-            Yaml::Map(m) => Ok(self.parse_map(m)),
-            _ => Err(ParseFailure::NotAMap(
-                "Root yaml node must be an object".to_owned(),
-                root.pos().into(),
-            )),
-        }?;
+    fn parse(mut self, root: YamlNode<R>) -> Result<Workflow, ParseFailure> {
+        root.as_map().map(|m| self.parse_map(m)).map_err(|e| {
+            ParseFailure::NotAMap("Root yaml node must be an object".to_owned(), e.into())
+        })?;
         Ok(self.workflow)
     }
 }
@@ -49,8 +42,8 @@ where
         }
     }
 
-    fn parse_map(&mut self, m: &'a Map<R>) {
-        for (key, value) in m.iter() {
+    fn parse_map(&mut self, m: Map<R>) {
+        for (key, value) in m.into_iter() {
             match key.extract_str() {
                 Ok(s) => self.visit_root_key(s.to_lowercase(), key, value),
                 Err(a) => self.annotate(a),
@@ -58,7 +51,7 @@ where
         }
     }
 
-    fn visit_root_key(&mut self, raw_key: String, key: &YamlNode<R>, value: &'a YamlNode<R>) {
+    fn visit_root_key(&mut self, raw_key: String, key: YamlNode<R>, value: YamlNode<R>) {
         match raw_key.as_str() {
             "on" => self.on(value),
             "jobs" => self.jobs(value),
@@ -75,15 +68,15 @@ where
         self.annotations.add(a)
     }
 
-    fn on(&mut self, n: &'a YamlNode<R>) {
+    fn on(&mut self, n: YamlNode<R>) {
         match n.extract_map() {
             Ok(m) => {}
             Err(a) => self.annotate(a),
         }
     }
-    fn name(&mut self, n: &'a YamlNode<R>) {}
-    fn run_name(&mut self, n: &'a YamlNode<R>) {}
-    fn jobs(&mut self, n: &'a YamlNode<R>) {}
+    fn name(&mut self, n: YamlNode<R>) {}
+    fn run_name(&mut self, n: YamlNode<R>) {}
+    fn jobs(&mut self, n: YamlNode<R>) {}
 }
 
 #[derive(Display)]

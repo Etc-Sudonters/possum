@@ -3,6 +3,7 @@ use crate::document::Document;
 use crate::scavenge::parse as possum_parse;
 use crate::scavenge::workflow::WorkflowParser;
 use crate::scavenge::ParseFailure;
+use std::ffi::OsStr;
 use yaml_peg::parser::Loader;
 use yaml_peg::repr::RcRepr;
 
@@ -11,15 +12,15 @@ use std::path::PathBuf;
 
 pub fn build(mut root: PathBuf) -> Result<Project, InitFailures> {
     if !root.exists() {
-        return Err(InitFailures::DirectoryNotFound);
+        return Err(InitFailures::DirectoryNotFound(root));
     }
 
     if !root.is_dir() {
-        return Err(InitFailures::NotADirectory);
+        return Err(InitFailures::NotADirectory(root));
     }
 
     let mut workflow_dir = PathBuf::from(".github");
-    workflow_dir.push("workflow");
+    workflow_dir.push("workflows");
 
     let mut orig_root: Option<PathBuf> = None;
 
@@ -27,21 +28,20 @@ pub fn build(mut root: PathBuf) -> Result<Project, InitFailures> {
         let mut possible = root.clone();
         possible.push(workflow_dir);
 
+        println!("Looking at {}", possible.display());
         if possible.exists() {
             orig_root = Some(root);
             root = possible;
         } else {
-            return Err(InitFailures::NoWorkflowDirectoryFound);
+            return Err(InitFailures::NoWorkflowDirectoryFound(root));
         }
     }
 
-    let workflows = get_all_workflows(root.clone());
+    let workflows = get_all_workflows(&root);
     let mut project = Project::new(root);
     project.orig_root = orig_root;
 
     for p in workflows {
-        let p = p.unwrap();
-
         match std::fs::read(&p) {
             Ok(raw) => {
                 let mut annotations = Annotations::new();
@@ -70,17 +70,15 @@ pub fn build(mut root: PathBuf) -> Result<Project, InitFailures> {
     Ok(project)
 }
 
-fn get_all_workflows(mut root: PathBuf) -> glob::Paths {
-    root.push("*.ya?ml");
-    let pat = root.into_os_string().into_string().unwrap();
-    println!("using pattern {}", pat);
-    glob::glob_with(
-        &pat,
-        glob::MatchOptions {
-            case_sensitive: false,
-            require_literal_separator: true,
-            require_literal_leading_dot: true,
-        },
-    )
-    .unwrap()
+fn get_all_workflows(root: &PathBuf) -> Vec<PathBuf> {
+    std::fs::read_dir(root)
+        .unwrap()
+        .map(|d| d.unwrap().path())
+        .filter(|p| {
+            p.extension()
+                .and_then(OsStr::to_str)
+                .and_then(|ext| Some(ext.ends_with("yaml") || ext.ends_with("yml")))
+                .unwrap()
+        })
+        .collect()
 }

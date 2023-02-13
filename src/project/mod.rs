@@ -4,10 +4,10 @@ use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum InitFailures {
-    NoWorkflows,
-    DirectoryNotFound,
-    NoWorkflowDirectoryFound,
-    NotADirectory,
+    NoWorkflows(PathBuf),
+    DirectoryNotFound(PathBuf),
+    NoWorkflowDirectoryFound(PathBuf),
+    NotADirectory(PathBuf),
 }
 
 #[derive(Debug)]

@@ -18,22 +18,30 @@ where
     R: Repr + 'a,
     P: Parser<'a, R, T>,
 {
-    let documents = loader
+    let mut documents = loader
         .parse()
         .map_err(|e| ParseFailure::InvalidDocument(e))?;
 
-    match documents[..] {
-        [] => Err(ParseFailure::Empty),
-        [root] => Ok(parser.parse(root)),
-        _ => Err(ParseFailure::TooManyDocuments(vec![])),
-    }
+    if documents.len() == 0 {
+        return Err(ParseFailure::Empty);
+    } else if documents.len() > 1 {
+        return Err(ParseFailure::TooManyDocuments(
+            documents
+                .iter()
+                .map(|n| DocumentPointer(n.pos() as usize))
+                .collect(),
+        ));
+    };
+
+    let root = documents.remove(0);
+    parser.parse(root)
 }
 
 pub trait Parser<'a, R, T>
 where
-    R: Repr,
+    R: Repr + 'a,
 {
-    fn parse(self, root: &'a YamlNode<R>) -> Result<T, ParseFailure>
+    fn parse(self, root: YamlNode<R>) -> Result<T, ParseFailure>
     where
         R: Repr;
 }

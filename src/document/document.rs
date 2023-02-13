@@ -18,11 +18,16 @@ pub enum DocumentError {
     OutOfBounds,
 }
 
-#[derive(Debug)]
 pub struct Document {
     raw: Vec<u8>,
     len: usize,
     lines: Vec<usize>,
+}
+
+impl std::fmt::Debug for Document {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "len: {:?}\t lines: {:?}", self.len, self.lines)
+    }
 }
 
 impl Document {
