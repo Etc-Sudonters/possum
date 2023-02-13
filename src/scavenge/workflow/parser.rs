@@ -1,52 +1,40 @@
-use std::marker::PhantomData;
+use strum::Display;
 
-use yaml_peg::parser::{Loader, PError};
 use yaml_peg::repr::Repr;
 use yaml_peg::{Map, Node as YamlNode, Yaml};
 
-use super::ast::{core, job, on, Step, Workflow};
+use super::Workflow;
 use crate::document::DocumentPointer;
 use crate::document::{Annotation, Annotations};
-use std::default::Default;
+use crate::scavenge::parser::{ParseFailure, Parser};
+use std::marker::PhantomData;
 
-pub enum ParseFailure {
-    InvalidDocument(PError),
-    Empty,
-    TooManyDocuments(Vec<DocumentPointer>),
-    NotAMap(String, DocumentPointer),
-}
-
-pub fn parse<'a, R>(
-    loader: &'a mut Loader<'a, R>,
-    annotations: &'a mut Annotations,
-) -> Result<Workflow, ParseFailure>
-where
-    R: Repr,
-{
-    let documents = loader
-        .parse()
-        .map_err(|e| ParseFailure::InvalidDocument(e))?;
-
-    match &documents[..] {
-        [n] => match &n.yaml() {
-            Yaml::Map(m) => Ok(WorkflowParser::new(annotations).parse(m)),
-            _ => Err(ParseFailure::NotAMap(
-                "Root yaml node must be an object".to_owned(),
-                DocumentPointer(n.pos()),
-            )),
-        },
-        [] => Err(ParseFailure::Empty),
-        _ => Err(ParseFailure::TooManyDocuments(vec![])),
-    }
-}
-
-struct WorkflowParser<'a, R>
+pub struct WorkflowParser<'a, R>
 where
     R: Repr,
 {
     _x: PhantomData<R>,
     annotations: &'a mut Annotations,
     workflow: Workflow,
+}
+
+impl<'a, R> Parser<'a, R, Workflow> for WorkflowParser<'a, R>
+where
+    R: Repr,
+{
+    fn parse(mut self, root: &'a YamlNode<R>) -> Result<Workflow, ParseFailure>
+    where
+        R: Repr,
+    {
+        match root.yaml() {
+            Yaml::Map(m) => Ok(self.parse_map(m)),
+            _ => Err(ParseFailure::NotAMap(
+                "Root yaml node must be an object".to_owned(),
+                root.pos().into(),
+            )),
+        }?;
+        Ok(self.workflow)
+    }
 }
 
 impl<'a, R> WorkflowParser<'a, R>
@@ -61,15 +49,13 @@ where
         }
     }
 
-    pub fn parse(mut self, m: &'a Map<R>) -> Workflow {
+    fn parse_map(&mut self, m: &'a Map<R>) {
         for (key, value) in m.iter() {
-            match extract_str_key(key) {
+            match key.extract_str() {
                 Ok(s) => self.visit_root_key(s.to_lowercase(), key, value),
                 Err(a) => self.annotate(a),
             }
         }
-
-        self.workflow
     }
 
     fn visit_root_key(&mut self, raw_key: String, key: &YamlNode<R>, value: &'a YamlNode<R>) {
@@ -79,7 +65,7 @@ where
             "name" => self.name(value),
             "run_name" => self.run_name(value),
             _ => self.annotate(Annotation::warn(
-                DocumentPointer(key.pos()),
+                key.pos().into(),
                 format!("unknown key {raw_key}").as_str(),
             )),
         }
@@ -89,21 +75,80 @@ where
         self.annotations.add(a)
     }
 
-    fn on(&mut self, n: &'a YamlNode<R>) {}
+    fn on(&mut self, n: &'a YamlNode<R>) {
+        match n.extract_map() {
+            Ok(m) => {}
+            Err(a) => self.annotate(a),
+        }
+    }
     fn name(&mut self, n: &'a YamlNode<R>) {}
     fn run_name(&mut self, n: &'a YamlNode<R>) {}
     fn jobs(&mut self, n: &'a YamlNode<R>) {}
 }
 
-fn extract_str_key<'a, R>(key: &'a YamlNode<R>) -> Result<&'a str, Annotation>
+#[derive(Display)]
+enum YamlKind {
+    Map,
+    Seq,
+    Str,
+    Bool,
+    Number,
+    Alias,
+    Null,
+}
+
+impl<'a, R> Into<YamlKind> for &'a YamlNode<R>
 where
     R: Repr,
 {
-    match key.as_str() {
-        Ok(s) => Ok(s),
-        Err(pos) => Err(Annotation::error(
-            DocumentPointer(pos),
-            "workflow keys must be strings",
-        )),
+    fn into(self) -> YamlKind {
+        use yaml_peg::Yaml::*;
+
+        match self.yaml() {
+            Null => YamlKind::Null,
+            Map(_) => YamlKind::Map,
+            Seq(_) => YamlKind::Seq,
+            Bool(_) => YamlKind::Bool,
+            Int(_) | Float(_) => YamlKind::Number,
+            Str(_) => YamlKind::Str,
+            Alias(_) => YamlKind::Alias,
+        }
     }
+}
+
+enum YamlNumber {
+    Int(i64),
+    Float(f64),
+}
+
+type Extraction<T> = Result<T, Annotation>;
+
+trait Extract<'a, R>
+where
+    R: Repr,
+{
+    fn extract_map(&'a self) -> Extraction<Map<R>>;
+    fn extract_str(&'a self) -> Extraction<&'a str>;
+}
+
+impl<'a, R> Extract<'a, R> for YamlNode<R>
+where
+    R: Repr,
+{
+    fn extract_map(&'a self) -> Extraction<Map<R>> {
+        self.as_map()
+            .map_err(|pos| expected("map", self.into(), pos.into()))
+    }
+
+    fn extract_str(&'a self) -> Extraction<&'a str> {
+        self.as_str()
+            .map_err(|pos| expected("seq", self.into(), pos.into()))
+    }
+}
+
+fn expected<'a>(expected: &'a str, found: YamlKind, pointer: DocumentPointer) -> Annotation {
+    Annotation::error(
+        pointer,
+        format!("expected {} but found {}", expected, found).as_str(),
+    )
 }

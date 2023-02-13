@@ -1,5 +1,6 @@
 use super::document::DocumentPointer;
 
+#[derive(Debug)]
 pub struct Annotations(Vec<Annotation>);
 
 impl Annotations {
@@ -12,6 +13,7 @@ impl Annotations {
     }
 }
 
+#[derive(Debug)]
 pub enum AnnotationLevel {
     Info,
     Warn,
@@ -19,6 +21,7 @@ pub enum AnnotationLevel {
     Fatal,
 }
 
+#[derive(Debug)]
 pub struct Annotation(AnnotationLevel, String, DocumentPointer);
 
 impl Annotation {

@@ -1,13 +1,16 @@
 use strum::Display;
 
-use super::core::*;
+use crate::scavenge::ast::*;
+
+#[derive(Debug)]
 pub enum Trigger {
-    Base(Node<EventKind>),
-    Array(Node<Seq<EventKind>>),
-    Events(Node<Seq<Event>>),
+    Base(PossumNode<EventKind>),
+    Array(PossumNode<Seq<EventKind>>),
+    Events(PossumNode<Seq<Event>>),
 }
 
-node!(
+possum_node!(
+    #[derive(Debug)]
     struct Event {
         kind: EventKind,
         branches: Seq<String>,
@@ -62,7 +65,8 @@ pub enum EventKind {
     WorkflowRun,
 }
 
-node!(
+possum_node!(
+    #[derive(Debug)]
     struct WorkflowInput {
         name: String,
         description: String,
@@ -73,12 +77,14 @@ node!(
     }
 );
 
+#[derive(Debug)]
 pub enum WorkflowInputDefault {
-    Str(Node<String>),
-    Number(Node<i64>),
-    Bool(Node<bool>),
+    Str(PossumNode<String>),
+    Number(PossumNode<i64>),
+    Bool(PossumNode<bool>),
 }
 
+#[derive(Debug)]
 pub enum WorkflowInputType {
     Str,
     Number,
@@ -86,7 +92,8 @@ pub enum WorkflowInputType {
     Choice,
 }
 
-node!(
+possum_node!(
+    #[derive(Debug)]
     struct WorkflowOutput {
         name: String,
         description: String,
@@ -94,7 +101,8 @@ node!(
     }
 );
 
-node!(
+possum_node!(
+    #[derive(Debug)]
     struct InheritedSecret {
         name: String,
         description: String,
