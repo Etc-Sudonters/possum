@@ -1,7 +1,7 @@
 use strum::Display;
 
 use yaml_peg::repr::Repr;
-use yaml_peg::{Map, Node as YamlNode};
+use yaml_peg::{Map, Node as YamlNode, Yaml};
 
 use super::Workflow;
 use crate::document::DocumentPointer;
@@ -69,11 +69,17 @@ where
     }
 
     fn on(&mut self, n: YamlNode<R>) {
-        match n.extract_map() {
-            Ok(m) => {}
-            Err(a) => self.annotate(a),
+        match n.yaml() {
+            Yaml::Map(m) => {}
+            Yaml::Seq(s) => {}
+            Yaml::Str(s) => {}
+            _ => self.annotate(Annotation::error(
+                n.pos().into(),
+                "Expected str, map or sequence",
+            )),
         }
     }
+
     fn name(&mut self, n: YamlNode<R>) {}
     fn run_name(&mut self, n: YamlNode<R>) {}
     fn jobs(&mut self, n: YamlNode<R>) {}
