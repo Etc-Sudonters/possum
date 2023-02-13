@@ -10,7 +10,7 @@ impl Display for OneLineRender {
         for entry in self.0.entries() {
             match entry {
                 ProjectEntry::ParseFailure(path, err) => {
-                    writeln!(f, "{}||{}", path.display(), OneLineParseFailure(err))?;
+                    writeln!(f, "{}:: {}", path.display(), OneLineParseFailure(err))?;
                 }
                 ProjectEntry::Workflow {
                     source,
@@ -21,7 +21,7 @@ impl Display for OneLineRender {
                     for a in annotations.entries() {
                         writeln!(
                             f,
-                            "{}|{}|{}",
+                            "{}:{}: {}",
                             source.display(),
                             OneLineDocumentPosition(document.pos(&a).unwrap()),
                             &a
@@ -39,7 +39,7 @@ struct OneLineDocumentPosition(DocumentPosition);
 
 impl Display for OneLineDocumentPosition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} col {}", self.0.line(), self.0.col())
+        write!(f, "{}:{}", self.0.line(), self.0.col())
     }
 }
 

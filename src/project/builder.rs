@@ -1,8 +1,8 @@
 use crate::document::Annotations;
 use crate::document::Document;
 use crate::scavenge::parse as possum_parse;
-use crate::scavenge::workflow::WorkflowParser;
 use crate::scavenge::ParseFailure;
+use crate::workflow::WorkflowParser;
 use std::ffi::OsStr;
 use yaml_peg::parser::Loader;
 use yaml_peg::repr::RcRepr;

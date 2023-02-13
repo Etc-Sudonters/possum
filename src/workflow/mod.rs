@@ -1,17 +1,39 @@
+pub mod job;
+pub mod on;
+pub mod parser;
+
+pub use self::parser::WorkflowParser;
+use crate::scavenge::ast::*;
+use std::default::Default;
+
+possum_node! {
+    #[derive(Debug,Default)]
+    struct Workflow {
+        name: String,
+        run_name: String,
+        on: on::Trigger,
+        jobs: job::Job,
+    }
+}
+
 #[derive(Debug)]
-pub struct Builder {}
-
-pub enum Trigger {
-    Push,
-    WorkflowDispatch,
+pub enum Concurrency {
+    Concurrency(String),
+    Group {
+        group: PossumNode<String>,
+        cancel_in_progress: PossumNode<bool>,
+    },
 }
 
-pub enum Job {
-    Inline(Vec<Step>),
-    Workflow,
+#[derive(Debug)]
+pub enum Permission {
+    GlobalGrant(PossumNode<Grant>),
+    GlobalRevoke,
+    IndividualGrants(PossumNode<Map<String, Grant>>),
 }
 
-pub enum Step {
-    Inline,
-    Action,
+#[derive(Debug)]
+pub enum Grant {
+    Read,
+    Write,
 }

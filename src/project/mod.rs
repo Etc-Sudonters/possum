@@ -61,7 +61,7 @@ pub enum ProjectEntry {
         source: PathBuf,
         document: super::document::Document,
         annotations: super::document::Annotations,
-        workflow: super::scavenge::workflow::Workflow,
+        workflow: super::workflow::Workflow,
     },
     ParseFailure(PathBuf, ParseFailure),
 }

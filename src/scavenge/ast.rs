@@ -45,3 +45,5 @@ macro_rules! possum_node {
     // terminal
     () => {};
 }
+
+pub(crate) use possum_node;
