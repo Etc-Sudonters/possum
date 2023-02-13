@@ -1,3 +1,4 @@
+use std::convert::AsRef;
 use std::convert::From;
 
 #[derive(Debug, Copy, Clone)]
@@ -14,6 +15,17 @@ impl From<u64> for DocumentPointer {
 
 pub struct DocumentPosition(usize, usize);
 
+impl DocumentPosition {
+    pub fn line(&self) -> usize {
+        self.0
+    }
+
+    pub fn col(&self) -> usize {
+        self.1
+    }
+}
+
+#[derive(Debug)]
 pub enum DocumentError {
     OutOfBounds,
 }
@@ -41,8 +53,11 @@ impl Document {
         Document { raw, len, lines }
     }
 
-    pub fn pos(&self, p: &DocumentPointer) -> Result<DocumentPosition, DocumentError> {
-        let mut pos = p.0;
+    pub fn pos<P>(&self, p: P) -> Result<DocumentPosition, DocumentError>
+    where
+        P: AsRef<DocumentPointer>,
+    {
+        let mut pos = p.as_ref().0;
         for (line, len) in self.lines.iter().enumerate() {
             if *len > pos {
                 return Ok(DocumentPosition(line, pos));

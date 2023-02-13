@@ -28,7 +28,6 @@ pub fn build(mut root: PathBuf) -> Result<Project, InitFailures> {
         let mut possible = root.clone();
         possible.push(workflow_dir);
 
-        println!("Looking at {}", possible.display());
         if possible.exists() {
             orig_root = Some(root);
             root = possible;

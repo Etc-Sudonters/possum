@@ -23,9 +23,9 @@ where
     R: Repr + 'a,
 {
     fn parse(mut self, root: YamlNode<R>) -> Result<Workflow, ParseFailure> {
-        root.as_map().map(|m| self.parse_map(m)).map_err(|e| {
-            ParseFailure::NotAMap("Root yaml node must be an object".to_owned(), e.into())
-        })?;
+        root.as_map()
+            .map(|m| self.parse_map(m))
+            .map_err(|e| ParseFailure::NotAMap(e.into()))?;
         Ok(self.workflow)
     }
 }

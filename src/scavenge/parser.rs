@@ -9,7 +9,7 @@ pub enum ParseFailure {
     InvalidDocument(PError),
     Empty,
     TooManyDocuments(Vec<DocumentPointer>),
-    NotAMap(String, DocumentPointer),
+    NotAMap(DocumentPointer),
     CouldntOpen,
 }
 

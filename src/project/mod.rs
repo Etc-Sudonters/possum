@@ -45,6 +45,14 @@ impl Project {
     pub fn push(&mut self, p: ProjectEntry) {
         self.entries.push(p)
     }
+
+    pub fn entries<'a>(&'a self) -> std::slice::Iter<ProjectEntry> {
+        self.entries.iter()
+    }
+
+    pub fn root(&self) -> PathBuf {
+        self.root.clone()
+    }
 }
 
 #[derive(Debug)]

@@ -57,6 +57,7 @@ mod scavenge;
 mod workflow;
 
 use clap::Parser;
+use cli::render::{DebugRender, OneLineRender};
 use cli::Arguments;
 use project::builder::build;
 
@@ -65,7 +66,13 @@ fn main() {
     let project = build(args.directory);
 
     match project {
-        Ok(proj) => println!("{:#?}", proj),
         Err(err) => println!("{:#?}", err),
+        Ok(proj) => {
+            if args.one_line {
+                print!("{}", OneLineRender(proj));
+            } else {
+                print!("{}", DebugRender(proj));
+            }
+        }
     }
 }
