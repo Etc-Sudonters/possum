@@ -6,8 +6,8 @@ pub use self::parser::WorkflowParser;
 use crate::scavenge::ast::*;
 use std::default::Default;
 
-possum_node! {
-    #[derive(Debug,Default)]
+possum_node_type! {
+    #[derive(Debug, Default)]
     struct Workflow {
         name: String,
         run_name: String,
@@ -29,7 +29,7 @@ pub enum Concurrency {
 pub enum Permission {
     GlobalGrant(PossumNode<Grant>),
     GlobalRevoke,
-    IndividualGrants(PossumNode<Map<String, Grant>>),
+    IndividualGrants(PossumNode<PossumMap<String, Grant>>),
 }
 
 #[derive(Debug)]

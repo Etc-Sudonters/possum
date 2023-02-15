@@ -16,10 +16,12 @@ impl From<u64> for DocumentPointer {
 pub struct DocumentPosition(usize, usize);
 
 impl DocumentPosition {
+    // 1 indexed
     pub fn line(&self) -> usize {
         self.0
     }
 
+    // 1 indexed
     pub fn col(&self) -> usize {
         self.1
     }
@@ -60,7 +62,8 @@ impl Document {
         let mut pos = p.as_ref().0;
         for (line, len) in self.lines.iter().enumerate() {
             if *len > pos {
-                return Ok(DocumentPosition(line, pos));
+                // this is real super duper wrong, just works because I only have ascii documents
+                return Ok(DocumentPosition(line + 1, pos + 1));
             } else {
                 pos -= len
             }

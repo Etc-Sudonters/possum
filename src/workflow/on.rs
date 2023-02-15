@@ -1,31 +1,72 @@
-use strum::Display;
+use std::iter::FromIterator;
+use std::{fmt::Display, str::FromStr};
 
 use crate::scavenge::ast::*;
 
-#[derive(Debug)]
-pub enum Trigger {
-    Base(PossumNode<EventKind>),
-    Array(PossumNode<Seq<EventKind>>),
-    Events(PossumNode<Seq<Event>>),
+#[derive(Debug, Default)]
+pub struct Trigger(PossumSeq<Event>);
+
+impl Trigger {
+    pub fn new() -> Trigger {
+        Trigger(PossumSeq::new())
+    }
+
+    pub fn push(&mut self, e: PossumNode<Event>) {
+        self.0.push(e)
+    }
 }
 
-possum_node!(
-    #[derive(Debug)]
+impl Into<Trigger> for Vec<PossumNode<Event>> {
+    fn into(self) -> Trigger {
+        Trigger(self.into())
+    }
+}
+
+impl Into<Trigger> for PossumNode<Event> {
+    fn into(self) -> Trigger {
+        Trigger((vec![self]).into())
+    }
+}
+
+impl Into<Event> for PossumNode<EventKind> {
+    fn into(self) -> Event {
+        Event::new(self)
+    }
+}
+
+impl FromIterator<PossumNode<Event>> for Trigger {
+    fn from_iter<T: IntoIterator<Item = PossumNode<Event>>>(iter: T) -> Self {
+        let evts: Vec<PossumNode<Event>> = iter.into_iter().collect();
+        evts.into()
+    }
+}
+
+possum_node_type!(
+    #[derive(Debug, Default)]
     struct Event {
         kind: EventKind,
-        branches: Seq<String>,
-        branches_ignore: Seq<String>,
-        paths: Seq<String>,
-        paths_ignore: Seq<String>,
-        tags: Seq<String>,
-        tags_ignore: Seq<String>,
-        inputs: Seq<WorkflowInput>,
-        outputs: Seq<WorkflowOutput>,
-        secrets: Seq<InheritedSecret>,
+        branches: PossumSeq<String>,
+        branches_ignore: PossumSeq<String>,
+        paths: PossumSeq<String>,
+        paths_ignore: PossumSeq<String>,
+        tags: PossumSeq<String>,
+        tags_ignore: PossumSeq<String>,
+        inputs: PossumSeq<WorkflowInput>,
+        outputs: PossumSeq<WorkflowOutput>,
+        secrets: PossumSeq<InheritedSecret>,
     }
 );
 
-#[derive(Debug, Eq, PartialEq, Display)]
+impl Event {
+    pub fn new(kind: PossumNode<EventKind>) -> Event {
+        Event {
+            kind: Some(kind),
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, strum::Display, strum::EnumString)]
 #[strum(serialize_all = "snake_case")]
 pub enum EventKind {
     BranchProtectionRule,
@@ -65,7 +106,13 @@ pub enum EventKind {
     WorkflowRun,
 }
 
-possum_node!(
+impl EventKind {
+    pub fn what_to_name(raw: &str) -> Result<EventKind, BadEvent> {
+        EventKind::from_str(raw).map_err(|_| BadEvent::Unknown(raw.to_owned()))
+    }
+}
+
+possum_node_type!(
     #[derive(Debug)]
     struct WorkflowInput {
         name: String,
@@ -73,7 +120,7 @@ possum_node!(
         default: WorkflowInputDefault,
         required: bool,
         input_type: WorkflowInputType,
-        choices: Seq<String>,
+        choices: PossumSeq<String>,
     }
 );
 
@@ -92,7 +139,7 @@ pub enum WorkflowInputType {
     Choice,
 }
 
-possum_node!(
+possum_node_type!(
     #[derive(Debug)]
     struct WorkflowOutput {
         name: String,
@@ -101,7 +148,7 @@ possum_node!(
     }
 );
 
-possum_node!(
+possum_node_type!(
     #[derive(Debug)]
     struct InheritedSecret {
         name: String,
@@ -109,3 +156,15 @@ possum_node!(
         required: bool,
     }
 );
+
+pub enum BadEvent {
+    Unknown(String),
+}
+
+impl Display for BadEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BadEvent::Unknown(s) => write!(f, "unknown event {s}"),
+        }
+    }
+}

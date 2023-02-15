@@ -1,29 +1,64 @@
+use crate::document::DocumentPointer;
+
 #[derive(Debug)]
 pub struct PossumNode<T> {
-    location: usize,
-    kind: NodeKind<T>,
+    location: DocumentPointer,
+    kind: PossumNodeKind<T>,
+}
+
+impl<T> PossumNode<T> {
+    pub fn new(location: DocumentPointer, kind: PossumNodeKind<T>) -> PossumNode<T> {
+        PossumNode { location, kind }
+    }
 }
 
 #[derive(Debug)]
-pub enum NodeKind<T> {
+pub enum PossumNodeKind<T> {
     Invalid(String),
     Expr(String),
     Value(T),
 }
 
 #[derive(Debug)]
-pub struct Map<K, V> {
-    keys: Seq<K>,
-    values: Seq<V>,
+pub struct PossumMap<K, V> {
+    keys: PossumSeq<K>,
+    values: PossumSeq<V>,
 }
 
-#[derive(Debug)]
-pub struct Seq<T> {
+impl<K, V> PossumMap<K, V> {
+    pub fn new() -> PossumMap<K, V> {
+        PossumMap {
+            keys: PossumSeq::new(),
+            values: PossumSeq::new(),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct PossumSeq<T> {
     entries: Vec<PossumNode<T>>,
 }
 
+impl<T> Into<PossumSeq<T>> for Vec<PossumNode<T>> {
+    fn into(self) -> PossumSeq<T> {
+        PossumSeq { entries: self }
+    }
+}
+
+impl<T> PossumSeq<T> {
+    pub fn new() -> PossumSeq<T> {
+        PossumSeq {
+            entries: Vec::new(),
+        }
+    }
+    pub fn push(&mut self, t: PossumNode<T>) {
+        self.entries.push(t)
+    }
+}
+
 //TODO(ANR): expand to include enums
-macro_rules! possum_node {
+#[macro_export]
+macro_rules! possum_node_type {
     // struct
     {
         $(#[$outer:meta])*
@@ -38,7 +73,7 @@ macro_rules! possum_node {
         pub struct $name {
         $(
             $(#[$inner $(args)*])*
-            $field: Option<$crate::scavenge::ast::PossumNode<$t>>,
+            pub $field: Option<$crate::scavenge::ast::PossumNode<$t>>,
         )*
         }
     };
@@ -46,4 +81,4 @@ macro_rules! possum_node {
     () => {};
 }
 
-pub(crate) use possum_node;
+pub(crate) use possum_node_type;

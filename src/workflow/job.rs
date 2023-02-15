@@ -2,20 +2,20 @@ use super::Concurrency;
 use super::Permission;
 use crate::scavenge::ast::*;
 
-possum_node!(
+possum_node_type!(
     #[derive(Debug)]
     struct Job {
         id: String,
         name: String,
         permissions: Permission,
-        needs: Seq<String>,
+        needs: PossumSeq<String>,
         cond: String,
         runs_on: String,
         environment: Environment,
         concurrency: Concurrency,
-        outputs: Map<String, String>,
-        env: Map<String, String>,
-        steps: Seq<Step>,
+        outputs: PossumMap<String, String>,
+        env: PossumMap<String, String>,
+        steps: PossumSeq<Step>,
         timeout_minutes: u64,
         continue_on_error: bool,
         uses: String,
@@ -34,14 +34,14 @@ pub enum Environment {
 
 #[derive(Debug)]
 pub enum With {
-    Args(PossumNode<Map<String, String>>),
+    Args(PossumNode<PossumMap<String, String>>),
     Container {
         args: PossumNode<String>,
         entrypoint: PossumNode<String>,
     },
 }
 
-possum_node!(
+possum_node_type!(
     #[derive(Debug)]
     struct Step {
         id: String,
@@ -60,5 +60,5 @@ pub enum StepWith {
         args: PossumNode<String>,
         entrypoint: PossumNode<String>,
     },
-    Args(Map<String, String>),
+    Args(PossumMap<String, String>),
 }

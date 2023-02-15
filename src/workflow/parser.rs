@@ -1,13 +1,15 @@
-use strum::Display;
-
 use yaml_peg::repr::Repr;
 use yaml_peg::{Map, Node as YamlNode, Yaml};
 
+use super::on::{self, EventKind};
 use super::Workflow;
-use crate::document::DocumentPointer;
 use crate::document::{Annotation, Annotations};
+use crate::scavenge::ast::{PossumNode, PossumNodeKind};
+use crate::scavenge::extraction::{ExpectedYaml, Extract};
 use crate::scavenge::parser::{ParseFailure, Parser};
+use crate::scavenge::yaml::YamlKind;
 use std::marker::PhantomData;
+use std::string::ToString;
 
 pub struct WorkflowParser<'a, R>
 where
@@ -32,7 +34,7 @@ where
 
 impl<'a, R> WorkflowParser<'a, R>
 where
-    R: Repr,
+    R: Repr + 'a,
 {
     pub fn new(a: &'a mut Annotations) -> WorkflowParser<'a, R> {
         WorkflowParser {
@@ -46,21 +48,29 @@ where
         for (key, value) in m.into_iter() {
             match key.extract_str() {
                 Ok(s) => self.visit_root_key(s.to_lowercase(), key, value),
-                Err(a) => self.annotate(a),
+                Err(a) => self.annotate(Annotation::error(key.pos().into(), &a.to_string())),
             }
         }
     }
 
     fn visit_root_key(&mut self, raw_key: String, key: YamlNode<R>, value: YamlNode<R>) {
         match raw_key.as_str() {
-            "on" => self.on(value),
-            "jobs" => self.jobs(value),
-            "name" => self.name(value),
-            "run_name" => self.run_name(value),
-            _ => self.annotate(Annotation::warn(
-                key.pos().into(),
-                format!("unknown key {raw_key}").as_str(),
-            )),
+            "on" => self.workflow.on = Some(PossumNode::new(key.pos().into(), self.on(value))),
+            "jobs" => {
+                self.jobs(value);
+            }
+            "name" => {
+                self.name(value);
+            }
+            "run_name" => {
+                self.run_name(value);
+            }
+            _ => {
+                self.annotate(Annotation::warn(
+                    key.pos().into(),
+                    format!("unknown key {raw_key}").as_str(),
+                ));
+            }
         }
     }
 
@@ -68,86 +78,50 @@ where
         self.annotations.add(a)
     }
 
-    fn on(&mut self, n: YamlNode<R>) {
-        match n.yaml() {
-            Yaml::Map(m) => {}
-            Yaml::Seq(s) => {}
-            Yaml::Str(s) => {}
-            _ => self.annotate(Annotation::error(
-                n.pos().into(),
-                "Expected str, map or sequence",
-            )),
+    fn on(&mut self, value: YamlNode<R>) -> PossumNodeKind<on::Trigger> {
+        match value.yaml() {
+            Yaml::Map(m) => PossumNodeKind::Value(Default::default()),
+            Yaml::Seq(seq) => PossumNodeKind::Value(
+                seq.into_iter()
+                    .map(|n| Self::event(n, YamlKind::Str))
+                    .collect(),
+            ),
+            Yaml::Str(s) => PossumNodeKind::Value(Self::event(&value, YamlKind::Str).into()),
+            y @ _ => PossumNodeKind::Invalid(
+                ExpectedYaml::AnyOf(vec![YamlKind::Map, YamlKind::Seq, YamlKind::Str])
+                    .but_found(y)
+                    .to_string(),
+            ),
+        }
+    }
+
+    fn event(value: &YamlNode<R>, expect: YamlKind) -> PossumNode<on::Event> {
+        match value.yaml() {
+            Yaml::Map(m) if expect == YamlKind::Map => {
+                todo!()
+            }
+            Yaml::Str(s) if expect == YamlKind::Str => PossumNode::new(
+                value.pos().into(),
+                PossumNodeKind::Value(on::Event::new(PossumNode::new(
+                    value.pos().into(),
+                    Self::event_name(s),
+                ))),
+            ),
+            n @ _ => PossumNode::new(
+                value.pos().into(),
+                PossumNodeKind::Invalid(ExpectedYaml::Only(expect).but_found(n).to_string()),
+            ),
+        }
+    }
+
+    fn event_name(value: &String) -> PossumNodeKind<EventKind> {
+        match EventKind::what_to_name(&value) {
+            Ok(ek) => PossumNodeKind::Value(ek),
+            Err(be) => PossumNodeKind::Invalid(be.to_string()),
         }
     }
 
     fn name(&mut self, n: YamlNode<R>) {}
     fn run_name(&mut self, n: YamlNode<R>) {}
     fn jobs(&mut self, n: YamlNode<R>) {}
-}
-
-#[derive(Display)]
-enum YamlKind {
-    Map,
-    Seq,
-    Str,
-    Bool,
-    Number,
-    Alias,
-    Null,
-}
-
-impl<'a, R> Into<YamlKind> for &'a YamlNode<R>
-where
-    R: Repr,
-{
-    fn into(self) -> YamlKind {
-        use yaml_peg::Yaml::*;
-
-        match self.yaml() {
-            Null => YamlKind::Null,
-            Map(_) => YamlKind::Map,
-            Seq(_) => YamlKind::Seq,
-            Bool(_) => YamlKind::Bool,
-            Int(_) | Float(_) => YamlKind::Number,
-            Str(_) => YamlKind::Str,
-            Alias(_) => YamlKind::Alias,
-        }
-    }
-}
-
-enum YamlNumber {
-    Int(i64),
-    Float(f64),
-}
-
-type Extraction<T> = Result<T, Annotation>;
-
-trait Extract<'a, R>
-where
-    R: Repr,
-{
-    fn extract_map(&'a self) -> Extraction<Map<R>>;
-    fn extract_str(&'a self) -> Extraction<&'a str>;
-}
-
-impl<'a, R> Extract<'a, R> for YamlNode<R>
-where
-    R: Repr,
-{
-    fn extract_map(&'a self) -> Extraction<Map<R>> {
-        self.as_map()
-            .map_err(|pos| expected("map", self.into(), pos.into()))
-    }
-
-    fn extract_str(&'a self) -> Extraction<&'a str> {
-        self.as_str()
-            .map_err(|pos| expected("seq", self.into(), pos.into()))
-    }
-}
-
-fn expected<'a>(expected: &'a str, found: YamlKind, pointer: DocumentPointer) -> Annotation {
-    Annotation::error(
-        pointer,
-        format!("expected {} but found {}", expected, found).as_str(),
-    )
 }
