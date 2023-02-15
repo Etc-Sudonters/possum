@@ -1,8 +1,7 @@
 mod on;
 use yaml_peg::repr::Repr;
-use yaml_peg::{Map, Node as YamlNode};
+use yaml_peg::{Map, Node as YamlNode, Yaml};
 
-use super::on::Trigger;
 use super::Workflow;
 use crate::document::{Annotation, Annotations};
 use crate::scavenge::ast::{PossumNode, PossumNodeKind};
@@ -24,7 +23,7 @@ impl<'a, R> Parser<'a, R, Workflow> for WorkflowParser<'a, R>
 where
     R: Repr + 'a,
 {
-    fn parse(mut self, root: YamlNode<R>) -> PossumNode<Workflow> {
+    fn parse(mut self, root: &Yaml<R>) -> PossumNodeKind<Workflow> {
         match root.extract_map() {
             Ok(m) => {
                 self.parse_map(m);
@@ -32,7 +31,6 @@ where
             }
             Err(e) => PossumNodeKind::Invalid(e.to_string()),
         }
-        .at(root.pos().into())
     }
 }
 

@@ -1,7 +1,7 @@
 use super::yaml::YamlKind;
 use std::fmt::Display;
 use yaml_peg::repr::Repr;
-use yaml_peg::{Map, Node as YamlNode, Seq};
+use yaml_peg::{Map, Seq, Yaml};
 
 pub struct UnexpectedYaml {
     expected: ExpectedYaml,
@@ -59,30 +59,33 @@ pub trait Extract<'a, R>
 where
     R: Repr,
 {
-    fn extract_map(&'a self) -> Extraction<Map<R>>;
+    fn extract_map(&'a self) -> Extraction<&'a Map<R>>;
     fn extract_str(&'a self) -> Extraction<&'a str>;
-    fn extract_seq(&'a self) -> Extraction<Seq<R>>;
+    fn extract_seq(&'a self) -> Extraction<&'a Seq<R>>;
 }
 
-impl<'a, R> Extract<'a, R> for YamlNode<R>
+impl<'a, R> Extract<'a, R> for Yaml<R>
 where
     R: Repr,
 {
-    fn extract_map(&'a self) -> Extraction<Map<R>> {
-        self.as_map().map_err(|pos| {
-            ExpectedYaml::Only(YamlKind::Map).but_found(YamlKind::from_yaml_node(self))
-        })
+    fn extract_map(&'a self) -> Extraction<&'a Map<R>> {
+        match self {
+            Yaml::Map(m) => Ok(m),
+            _ => Err(ExpectedYaml::Only(YamlKind::Map).but_found(YamlKind::from_yaml(self))),
+        }
     }
 
     fn extract_str(&'a self) -> Extraction<&'a str> {
-        self.as_str().map_err(|pos| {
-            ExpectedYaml::Only(YamlKind::Str).but_found(YamlKind::from_yaml_node(self))
-        })
+        match self {
+            Yaml::Str(s) => Ok(s),
+            _ => Err(ExpectedYaml::Only(YamlKind::Str).but_found(YamlKind::from_yaml(self))),
+        }
     }
 
-    fn extract_seq(&'a self) -> Extraction<Seq<R>> {
-        self.as_seq().map_err(|pos| {
-            ExpectedYaml::Only(YamlKind::Str).but_found(YamlKind::from_yaml_node(self))
-        })
+    fn extract_seq(&'a self) -> Extraction<&'a Seq<R>> {
+        match self {
+            Yaml::Seq(s) => Ok(s),
+            _ => Err(ExpectedYaml::Only(YamlKind::Seq).but_found(YamlKind::from_yaml(self))),
+        }
     }
 }

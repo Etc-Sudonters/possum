@@ -1,8 +1,8 @@
 use yaml_peg::parser::{Loader, PError};
 use yaml_peg::repr::Repr;
-use yaml_peg::Node as YamlNode;
+use yaml_peg::Yaml;
 
-use super::ast::PossumNode;
+use super::ast::{PossumNode, PossumNodeKind};
 use crate::document::DocumentPointer;
 
 #[derive(Debug)]
@@ -37,14 +37,14 @@ where
     };
 
     let root = documents.remove(0);
-    Ok(parser.parse(root))
+    Ok(parser.parse(root.yaml()).at(root.pos().into()))
 }
 
 pub trait Parser<'a, R, T>
 where
     R: Repr + 'a,
 {
-    fn parse(self, root: YamlNode<R>) -> PossumNode<T>
+    fn parse(self, root: &Yaml<R>) -> PossumNodeKind<T>
     where
         R: Repr;
 }

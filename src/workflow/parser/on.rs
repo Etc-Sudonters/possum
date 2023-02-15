@@ -7,13 +7,14 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
+use yaml_peg::Yaml;
 
 pub(super) fn parse<'a, R>(root: YamlNode<R>) -> PossumNode<on::Trigger>
 where
     R: Repr + 'a,
 {
     let mut parser = OnParser::<'a, R>::new();
-    parser.parse(root)
+    parser.parse(root.yaml()).at(root.pos().into())
 }
 
 #[derive(Default)]
@@ -30,24 +31,22 @@ where
     R: Repr + 'a,
 {
     #[allow(unreachable_code)]
-    fn parse(self, root: YamlNode<R>) -> PossumNode<on::Trigger>
+    fn parse(self, root: &Yaml<R>) -> PossumNodeKind<on::Trigger>
     where
         R: Repr,
     {
         use PossumNodeKind::{Invalid, Value};
         use YamlKind::{Map, Seq, Str};
-        let loc = root.pos().into();
-        match YamlKind::from_yaml(root.yaml()) {
+        match YamlKind::from_yaml(root) {
             Map => Value(todo!()),
-            Seq => Value(Self::events(root).into()),
-            Str => Value(Self::event(root, ExpectedYaml::Only(Str)).into()),
+            Seq => Value(Self::events(root.extract_seq().unwrap())),
+            Str => Value(Self::event(root, ExpectedYaml::Only(Str))),
             n @ _ => Invalid(
                 ExpectedYaml::AnyOf(vec![Map, Seq, Str])
                     .but_found(n)
                     .to_string(),
             ),
         }
-        .at(loc)
     }
 }
 
@@ -62,31 +61,26 @@ where
         }
     }
 
-    fn events(root: YamlNode<R>) -> PossumNode<PossumSeq<on::Event>> {
-        use PossumNodeKind::{Invalid, Value};
-        let loc = root.pos().into();
-        match root.extract_seq() {
-            Ok(kinds) => Value(kinds.into_iter().map(Self::event_kind).collect()),
-            Err(unexpected) => Invalid(unexpected.to_string()),
-        }
-        .at(loc)
+    fn events(root: Seq<R>) -> PossumSeq<on::EventKind> {
+        root.into_iter()
+            .map(|n| Self::event_kind(n.yaml()))
+            .collect()
     }
 
-    fn event(root: YamlNode<R>, expected: ExpectedYaml) -> PossumNode<on::Event> {
+    fn event(root: &Yaml<R>, expected: ExpectedYaml) -> PossumNodeKind<on::Event> {
+        use PossumNodeKind::Value;
         use YamlKind::{Map, Str};
-        let loc = root.pos().into();
-        match YamlKind::from_yaml_node(&root) {
+        match YamlKind::from_yaml(&root) {
             Map if expected == Map => todo!(),
             Str if expected == Str => {
                 let kind = Self::event_kind(root);
-                let evt = on::Event::new(kind);
-                PossumNodeKind::Value(evt).at(loc)
+                Value(on::Event::new(kind))
             }
             _ => todo!(),
         }
     }
 
-    fn event_kind(n: YamlNode<R>) -> PossumNode<on::EventKind> {
+    fn event_kind(n: &Yaml<R>) -> PossumNodeKind<on::EventKind> {
         use on::BadEvent::Unknown;
         use PossumNodeKind::{Invalid, Value};
         match n.extract_str() {
@@ -96,6 +90,5 @@ where
             },
             Err(n) => Invalid(n.to_string()),
         }
-        .at(n.pos().into())
     }
 }

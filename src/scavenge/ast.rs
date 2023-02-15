@@ -54,6 +54,13 @@ pub struct PossumSeq<T> {
     entries: Vec<PossumNode<T>>,
 }
 
+impl<T> FromIterator<PossumNode<T>> for PossumSeq<T> {
+    fn from_iter<I: IntoIterator<Item = PossumNode<T>>>(iter: I) -> Self {
+        let v: Vec<PossumNode<T>> = iter.into_iter().collect();
+        v.into()
+    }
+}
+
 impl<T> Into<PossumSeq<T>> for Vec<PossumNode<T>> {
     fn into(self) -> PossumSeq<T> {
         PossumSeq { entries: self }
