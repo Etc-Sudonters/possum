@@ -13,7 +13,13 @@ pub enum YamlKind {
 }
 
 impl YamlKind {
-    pub fn from_yaml_node<R>(n: &Yaml<R>) -> YamlKind
+    pub fn from_yaml_node<R>(n: &YamlNode<R>) -> YamlKind
+    where
+        R: Repr,
+    {
+        Self::from_yaml(n.yaml())
+    }
+    pub fn from_yaml<R>(n: &Yaml<R>) -> YamlKind
     where
         R: Repr,
     {
@@ -36,6 +42,6 @@ where
     R: Repr,
 {
     fn into(self) -> YamlKind {
-        YamlKind::from_yaml_node(self.yaml())
+        YamlKind::from_yaml_node(&self)
     }
 }

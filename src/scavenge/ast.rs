@@ -65,6 +65,7 @@ impl<T> PossumSeq<T> {
             entries: Vec::new(),
         }
     }
+
     pub fn push(&mut self, t: PossumNode<T>) {
         self.entries.push(t)
     }

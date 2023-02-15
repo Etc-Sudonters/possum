@@ -1,4 +1,3 @@
-use std::iter::FromIterator;
 use std::{fmt::Display, str::FromStr};
 
 use crate::scavenge::ast::*;
@@ -16,15 +15,17 @@ impl Trigger {
     }
 }
 
-impl Into<Trigger> for Vec<PossumNode<Event>> {
+impl Into<Trigger> for PossumSeq<Event> {
     fn into(self) -> Trigger {
-        Trigger(self.into())
+        Trigger(self)
     }
 }
 
 impl Into<Trigger> for PossumNode<Event> {
     fn into(self) -> Trigger {
-        Trigger((vec![self]).into())
+        let trig = Trigger::new();
+        trig.push(self);
+        trig
     }
 }
 
@@ -34,10 +35,11 @@ impl Into<Event> for PossumNode<EventKind> {
     }
 }
 
-impl FromIterator<PossumNode<Event>> for Trigger {
-    fn from_iter<T: IntoIterator<Item = PossumNode<Event>>>(iter: T) -> Self {
-        let evts: Vec<PossumNode<Event>> = iter.into_iter().collect();
-        evts.into()
+impl Into<Trigger> for PossumNode<EventKind> {
+    fn into(self) -> Trigger {
+        use PossumNodeKind::Value;
+        let loc = self.loc();
+        Value(Event::new(self)).at(loc).into()
     }
 }
 
