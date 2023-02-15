@@ -1,4 +1,5 @@
 use crate::document::DocumentPointer;
+use std::iter::FromIterator;
 
 #[derive(Debug)]
 pub struct PossumNode<T> {

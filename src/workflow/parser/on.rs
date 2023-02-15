@@ -63,10 +63,10 @@ where
     }
 
     fn events(root: YamlNode<R>) -> PossumNode<PossumSeq<on::Event>> {
-        use PossumNodeKind::Invalid;
+        use PossumNodeKind::{Invalid, Value};
         let loc = root.pos().into();
         match root.extract_seq() {
-            Ok(kinds) => todo!(),
+            Ok(kinds) => Value(kinds.into_iter().map(Self::event_kind).collect()),
             Err(unexpected) => Invalid(unexpected.to_string()),
         }
         .at(loc)
