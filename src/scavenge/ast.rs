@@ -10,6 +10,14 @@ impl<T> PossumNode<T> {
     pub fn new(location: DocumentPointer, kind: PossumNodeKind<T>) -> PossumNode<T> {
         PossumNode { location, kind }
     }
+
+    pub fn loc(&self) -> DocumentPointer {
+        self.location.clone()
+    }
+
+    pub fn data(&self) -> &PossumNodeKind<T> {
+        &self.kind
+    }
 }
 
 #[derive(Debug)]
@@ -17,6 +25,12 @@ pub enum PossumNodeKind<T> {
     Invalid(String),
     Expr(String),
     Value(T),
+}
+
+impl<T> PossumNodeKind<T> {
+    pub fn at(self, location: DocumentPointer) -> PossumNode<T> {
+        PossumNode::new(location, self)
+    }
 }
 
 #[derive(Debug)]

@@ -51,7 +51,6 @@ impl<'a> Display for OneLineParseFailure<'a> {
             ParseFailure::Empty => "document is empty".to_owned(),
             ParseFailure::CouldntOpen => "could not open document".to_owned(),
             ParseFailure::InvalidDocument(e) => e.to_string(),
-            ParseFailure::NotAMap(_) => "root node must be a map".to_owned(),
             ParseFailure::TooManyDocuments(_) => "too many documents in file".to_owned(),
         };
 

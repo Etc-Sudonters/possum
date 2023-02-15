@@ -2,6 +2,7 @@ use yaml_peg::parser::{Loader, PError};
 use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
 
+use super::ast::PossumNode;
 use crate::document::DocumentPointer;
 
 #[derive(Debug)]
@@ -9,11 +10,13 @@ pub enum ParseFailure {
     InvalidDocument(PError),
     Empty,
     TooManyDocuments(Vec<DocumentPointer>),
-    NotAMap(DocumentPointer),
     CouldntOpen,
 }
 
-pub fn parse<'a, R, T, P>(mut loader: Loader<'a, R>, parser: P) -> Result<T, ParseFailure>
+pub fn parse<'a, R, T, P>(
+    mut loader: Loader<'a, R>,
+    parser: P,
+) -> Result<PossumNode<T>, ParseFailure>
 where
     R: Repr + 'a,
     P: Parser<'a, R, T>,
@@ -34,14 +37,14 @@ where
     };
 
     let root = documents.remove(0);
-    parser.parse(root)
+    Ok(parser.parse(root))
 }
 
 pub trait Parser<'a, R, T>
 where
     R: Repr + 'a,
 {
-    fn parse(self, root: YamlNode<R>) -> Result<T, ParseFailure>
+    fn parse(self, root: YamlNode<R>) -> PossumNode<T>
     where
         R: Repr;
 }

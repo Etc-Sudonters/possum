@@ -24,9 +24,9 @@ pub enum ExpectedYaml {
 }
 
 impl ExpectedYaml {
-    pub fn but_found<R>(self, n: &Yaml<R>) -> UnexpectedYaml
+    pub fn but_found<Y>(self, n: Y) -> UnexpectedYaml
     where
-        R: Repr,
+        Y: Into<YamlKind>,
     {
         UnexpectedYaml {
             expected: self,
