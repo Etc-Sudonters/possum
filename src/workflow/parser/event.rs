@@ -10,8 +10,22 @@ pub struct EventParser<'a, R>
 where
     R: Repr + 'a,
 {
-    event: on::Event,
     _x: PhantomData<&'a R>,
+}
+
+impl<'a, R> Parser<'a, R, on::Event> for EventParser<'a, R>
+where
+    R: Repr + 'a,
+{
+    fn parse_node(mut self, root: &YamlNode<R>) -> PossumNodeKind<on::Event>
+    where
+        R: Repr,
+    {
+        match root.extract_map() {
+            Ok(m) => PossumNodeKind::Value(self.parse_map(m)),
+            Err(u) => PossumNodeKind::Invalid(u.to_string()),
+        }
+    }
 }
 
 impl<'a, R> EventParser<'a, R>
@@ -19,40 +33,40 @@ where
     R: Repr + 'a,
 {
     pub fn new() -> EventParser<'a, R> {
-        EventParser {
-            event: on::Event::default(),
-            _x: PhantomData,
-        }
+        EventParser { _x: PhantomData }
     }
 
-    fn parse_map(&mut self, root: &YamlMap<R>) {
+    fn parse_map(&mut self, root: &YamlMap<R>) -> on::Event {
+        let mut evt = on::Event::new();
         for (key, value) in root.iter() {
             match key.extract_str() {
-                Ok(s) => self.visit_event_key(s.to_lowercase(), value),
+                Ok(s) => self.visit_event_key(&mut evt, s.to_lowercase(), value),
                 Err(err) => todo!(),
             }
         }
+
+        evt
     }
 
-    fn visit_event_key(&mut self, key: String, value: &YamlNode<R>) {
+    fn visit_event_key(&mut self, event: &mut on::Event, key: String, value: &YamlNode<R>) {
         match key.as_str() {
             "branches" => {
-                self.event.branches = Some(get_globbed_paths(value));
+                event.branches = Some(get_globbed_paths(value));
             }
             "branches-ignore" => {
-                self.event.branches_ignore = Some(get_globbed_paths(value));
+                event.branches_ignore = Some(get_globbed_paths(value));
             }
             "paths" => {
-                self.event.paths = Some(get_globbed_paths(value));
+                event.paths = Some(get_globbed_paths(value));
             }
             "paths-ignore" => {
-                self.event.paths_ignore = Some(get_globbed_paths(value));
+                event.paths_ignore = Some(get_globbed_paths(value));
             }
             "tags" => {
-                self.event.tags = Some(get_globbed_paths(value));
+                event.tags = Some(get_globbed_paths(value));
             }
             "tags-ignore" => {
-                self.event.tags_ignore = Some(get_globbed_paths(value));
+                event.tags_ignore = Some(get_globbed_paths(value));
             }
             "inputs" => {}
             "outputs" => {}
@@ -83,23 +97,5 @@ where
                 .at(n.pos().into())
             })
             .collect()
-    }
-}
-
-impl<'a, R> Parser<'a, R, on::Event> for EventParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    fn parse_node(mut self, root: &YamlNode<R>) -> PossumNodeKind<on::Event>
-    where
-        R: Repr,
-    {
-        match root.extract_map() {
-            Ok(m) => {
-                self.parse_map(m);
-                PossumNodeKind::Value(self.event)
-            }
-            Err(u) => PossumNodeKind::Invalid(u.to_string()),
-        }
     }
 }
