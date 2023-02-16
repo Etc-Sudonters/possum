@@ -1,6 +1,6 @@
 use yaml_peg::parser::{Loader, PError};
 use yaml_peg::repr::Repr;
-use yaml_peg::Yaml;
+use yaml_peg::Node as YamlNode;
 
 use super::ast::{PossumNode, PossumNodeKind};
 use crate::document::DocumentPointer;
@@ -13,7 +13,7 @@ pub enum ParseFailure {
     CouldntOpen,
 }
 
-pub fn parse<'a, R, T, P>(
+pub fn parse_single_document<'a, R, T, P>(
     mut loader: Loader<'a, R>,
     parser: P,
 ) -> Result<PossumNode<T>, ParseFailure>
@@ -37,14 +37,14 @@ where
     };
 
     let root = documents.remove(0);
-    Ok(parser.parse(root.yaml()).at(root.pos().into()))
+    Ok(parser.parse_node(&root).at(root.pos().into()))
 }
 
 pub trait Parser<'a, R, T>
 where
     R: Repr + 'a,
 {
-    fn parse(self, root: &Yaml<R>) -> PossumNodeKind<T>
+    fn parse_node(self, root: &YamlNode<R>) -> PossumNodeKind<T>
     where
         R: Repr;
 }

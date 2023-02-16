@@ -1,6 +1,7 @@
+mod event;
 mod on;
 use yaml_peg::repr::Repr;
-use yaml_peg::{Map, Node as YamlNode, Yaml};
+use yaml_peg::{Map, Node as YamlNode};
 
 use super::Workflow;
 use crate::document::{Annotation, Annotations};
@@ -23,7 +24,7 @@ impl<'a, R> Parser<'a, R, Workflow> for WorkflowParser<'a, R>
 where
     R: Repr + 'a,
 {
-    fn parse(mut self, root: &Yaml<R>) -> PossumNodeKind<Workflow> {
+    fn parse_node(mut self, root: &YamlNode<R>) -> PossumNodeKind<Workflow> {
         match root.extract_map() {
             Ok(m) => {
                 self.parse_map(m);
@@ -46,7 +47,7 @@ where
         }
     }
 
-    fn parse_map(&mut self, m: Map<R>) {
+    fn parse_map(&mut self, m: &Map<R>) {
         for (key, value) in m.into_iter() {
             match key.extract_str() {
                 Ok(s) => self.visit_root_key(s.to_lowercase(), key, value),
@@ -55,7 +56,7 @@ where
         }
     }
 
-    fn visit_root_key(&mut self, raw_key: String, key: YamlNode<R>, value: YamlNode<R>) {
+    fn visit_root_key(&mut self, raw_key: String, key: &YamlNode<R>, value: &YamlNode<R>) {
         // we can't currently detect repeated keys ):
         match raw_key.as_str() {
             "name" => {
@@ -65,7 +66,8 @@ where
                 self.workflow.run_name = Some(self.run_name(value));
             }
             "on" => {
-                self.workflow.on = Some(on::parse(value));
+                let on = on::OnParser::new().parse_node(value);
+                self.workflow.on = Some(on.at(value.pos().into()));
             }
             "jobs" => {
                 self.jobs(value);
@@ -83,7 +85,7 @@ where
         self.annotations.add(a)
     }
 
-    fn name(&mut self, n: YamlNode<R>) -> PossumNode<String> {
+    fn name(&mut self, n: &YamlNode<R>) -> PossumNode<String> {
         match n.extract_str() {
             Ok(s) => PossumNodeKind::Value(s.to_owned()),
             Err(e) => PossumNodeKind::Invalid(e.to_string()),
@@ -91,7 +93,7 @@ where
         .at(n.pos().into())
     }
 
-    fn run_name(&mut self, n: YamlNode<R>) -> PossumNode<String> {
+    fn run_name(&mut self, n: &YamlNode<R>) -> PossumNode<String> {
         match n.extract_str() {
             Ok(s) => PossumNodeKind::Expr(s.to_owned()),
             Err(e) => PossumNodeKind::Invalid(e.to_string()),
@@ -99,5 +101,5 @@ where
         .at(n.pos().into())
     }
 
-    fn jobs(&mut self, n: YamlNode<R>) {}
+    fn jobs(&mut self, n: &YamlNode<R>) {}
 }

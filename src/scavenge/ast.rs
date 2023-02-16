@@ -1,5 +1,5 @@
 use crate::document::DocumentPointer;
-use std::iter::FromIterator;
+use std::iter::{FromIterator, IntoIterator};
 
 #[derive(Debug)]
 pub struct PossumNode<T> {
@@ -26,11 +26,19 @@ pub enum PossumNodeKind<T> {
     Invalid(String),
     Expr(String),
     Value(T),
+    Empty,
 }
 
 impl<T> PossumNodeKind<T> {
     pub fn at(self, location: DocumentPointer) -> PossumNode<T> {
         PossumNode::new(location, self)
+    }
+
+    pub fn invalid(&self) -> bool {
+        match self {
+            PossumNodeKind::Invalid(_) => true,
+            _ => false,
+        }
     }
 }
 
@@ -41,17 +49,31 @@ pub struct PossumMap<K, V> {
 }
 
 impl<K, V> PossumMap<K, V> {
-    pub fn new() -> PossumMap<K, V> {
+    pub fn empty() -> PossumMap<K, V> {
         PossumMap {
             keys: PossumSeq::new(),
             values: PossumSeq::new(),
         }
+    }
+
+    pub fn insert(&mut self, k: PossumNode<K>, v: PossumNode<V>) {
+        self.keys.push(k);
+        self.values.push(v);
     }
 }
 
 #[derive(Debug, Default)]
 pub struct PossumSeq<T> {
     entries: Vec<PossumNode<T>>,
+}
+
+impl<T> IntoIterator for PossumSeq<T> {
+    type Item = PossumNode<T>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.entries.into_iter()
+    }
 }
 
 impl<T> FromIterator<PossumNode<T>> for PossumSeq<T> {

@@ -2,69 +2,107 @@ use std::{fmt::Display, str::FromStr};
 
 use crate::scavenge::ast::*;
 
-#[derive(Debug, Default)]
-pub struct Trigger(PossumSeq<Event>);
+#[derive(Debug)]
+pub struct Trigger(PossumMap<EventKind, Event>);
 
 impl Trigger {
-    pub fn new() -> Trigger {
-        Trigger(PossumSeq::new())
+    pub fn empty() -> Trigger {
+        Trigger(PossumMap::empty())
     }
 
-    pub fn push(&mut self, e: PossumNode<Event>) {
-        self.0.push(e)
+    pub fn add_event(&mut self, kind: PossumNode<EventKind>, event: PossumNode<Event>) {
+        self.0.insert(kind, event);
     }
-}
 
-impl Into<Trigger> for PossumSeq<Event> {
-    fn into(self) -> Trigger {
-        Trigger(self)
-    }
-}
-
-impl Into<Trigger> for PossumNode<Event> {
-    fn into(self) -> Trigger {
-        let trig = Trigger::new();
-        trig.push(self);
-        trig
+    pub fn add_event_name(&mut self, kind: PossumNode<EventKind>) {
+        let loc = kind.loc();
+        self.add_event(kind, PossumNodeKind::Empty.at(loc));
     }
 }
 
-impl Into<Event> for PossumNode<EventKind> {
-    fn into(self) -> Event {
-        Event::new(self)
+impl Default for Trigger {
+    fn default() -> Self {
+        Self::empty()
     }
 }
 
 impl Into<Trigger> for PossumNode<EventKind> {
     fn into(self) -> Trigger {
-        use PossumNodeKind::Value;
+        let mut trig = Trigger::empty();
         let loc = self.loc();
-        Value(Event::new(self)).at(loc).into()
+        trig.add_event_name(self);
+        trig
+    }
+}
+
+impl Into<Trigger> for PossumSeq<EventKind> {
+    fn into(self) -> Trigger {
+        self.into_iter().collect()
+    }
+}
+
+impl FromIterator<PossumNode<EventKind>> for Trigger {
+    fn from_iter<T: IntoIterator<Item = PossumNode<EventKind>>>(iter: T) -> Self {
+        let mut trig = Trigger::empty();
+
+        for ek in iter.into_iter() {
+            trig.add_event_name(ek);
+        }
+
+        trig
+    }
+}
+
+impl FromIterator<(PossumNode<EventKind>, PossumNode<Event>)> for Trigger {
+    fn from_iter<T: IntoIterator<Item = (PossumNode<EventKind>, PossumNode<Event>)>>(
+        iter: T,
+    ) -> Self {
+        let mut trig = Trigger::default();
+
+        for (kind, event) in iter.into_iter() {
+            trig.add_event(kind, event)
+        }
+
+        trig
+    }
+}
+
+impl Into<Trigger> for PossumMap<EventKind, Event> {
+    fn into(self) -> Trigger {
+        Trigger(self)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Globbed(String);
+
+impl Globbed {
+    pub fn new<S>(s: S) -> Globbed
+    where
+        S: Into<String>,
+    {
+        Globbed(s.into())
     }
 }
 
 possum_node_type!(
     #[derive(Debug, Default)]
     struct Event {
-        kind: EventKind,
-        branches: PossumSeq<String>,
-        branches_ignore: PossumSeq<String>,
-        paths: PossumSeq<String>,
-        paths_ignore: PossumSeq<String>,
-        tags: PossumSeq<String>,
-        tags_ignore: PossumSeq<String>,
-        inputs: PossumSeq<WorkflowInput>,
-        outputs: PossumSeq<WorkflowOutput>,
-        secrets: PossumSeq<InheritedSecret>,
+        branches: PossumSeq<Globbed>,
+        branches_ignore: PossumSeq<Globbed>,
+        paths: PossumSeq<Globbed>,
+        paths_ignore: PossumSeq<Globbed>,
+        tags: PossumSeq<Globbed>,
+        tags_ignore: PossumSeq<Globbed>,
+        inputs: PossumMap<String, WorkflowInput>,
+        outputs: PossumMap<String, WorkflowOutput>,
+        secrets: PossumMap<String, InheritedSecret>,
     }
 );
 
 impl Event {
-    pub fn new(kind: PossumNode<EventKind>) -> Event {
-        Event {
-            kind: Some(kind),
-            ..Default::default()
-        }
+    pub fn new() -> Event {
+        Default::default()
     }
 }
 

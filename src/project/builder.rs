@@ -1,6 +1,6 @@
 use crate::document::Annotations;
 use crate::document::Document;
-use crate::scavenge::parse as possum_parse;
+use crate::scavenge::parse_single_document as possum_parse;
 use crate::scavenge::ParseFailure;
 use crate::workflow::WorkflowParser;
 use std::ffi::OsStr;

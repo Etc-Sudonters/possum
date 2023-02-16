@@ -1,8 +1,9 @@
 use super::yaml::YamlKind;
 use std::fmt::Display;
 use yaml_peg::repr::Repr;
-use yaml_peg::{Map, Seq, Yaml};
+use yaml_peg::{Map, Node as YamlNode, Seq, Yaml};
 
+#[derive(Debug)]
 pub struct UnexpectedYaml {
     expected: ExpectedYaml,
     unexpected: YamlKind,
@@ -18,6 +19,7 @@ impl Display for UnexpectedYaml {
     }
 }
 
+#[derive(Debug)]
 pub enum ExpectedYaml {
     Only(YamlKind),
     AnyOf(Vec<YamlKind>),
@@ -62,6 +64,23 @@ where
     fn extract_map(&'a self) -> Extraction<&'a Map<R>>;
     fn extract_str(&'a self) -> Extraction<&'a str>;
     fn extract_seq(&'a self) -> Extraction<&'a Seq<R>>;
+}
+
+impl<'a, R> Extract<'a, R> for YamlNode<R>
+where
+    R: Repr,
+{
+    fn extract_map(&'a self) -> Extraction<&'a Map<R>> {
+        self.yaml().extract_map()
+    }
+
+    fn extract_str(&'a self) -> Extraction<&'a str> {
+        self.yaml().extract_str()
+    }
+
+    fn extract_seq(&'a self) -> Extraction<&'a Seq<R>> {
+        self.yaml().extract_seq()
+    }
 }
 
 impl<'a, R> Extract<'a, R> for Yaml<R>
