@@ -1,5 +1,6 @@
-use crate::scavenge::ast::{PossumNode, PossumNodeKind, PossumSeq};
+use crate::scavenge::ast::{PossumMap, PossumNode, PossumNodeKind, PossumSeq};
 use crate::scavenge::extraction::Extract;
+use crate::scavenge::parser::unify;
 use crate::scavenge::Parser;
 use crate::workflow::on::{self, Globbed};
 use std::marker::PhantomData;
@@ -49,6 +50,7 @@ where
     }
 
     fn visit_event_key(&mut self, event: &mut on::Event, key: String, value: &YamlNode<R>) {
+        use PossumNodeKind::{Invalid, Value};
         match key.as_str() {
             "branches" => {
                 event.branches = Some(get_globbed_paths(value));
@@ -68,7 +70,17 @@ where
             "tags-ignore" => {
                 event.tags_ignore = Some(get_globbed_paths(value));
             }
-            "inputs" => {}
+            "inputs" => {
+                event.inputs = Some(
+                    unify(
+                        value
+                            .extract_map()
+                            .map_err(|e| Invalid(e.to_string()))
+                            .map(|i| Value(Self::inputs(i))),
+                    )
+                    .at(value.pos().into()),
+                );
+            }
             "outputs" => {}
             "secrets" => {}
             _ => {}
@@ -78,7 +90,6 @@ where
         where
             R: Repr + 'a,
         {
-            use PossumNodeKind::{Invalid, Value};
             match root.extract_seq() {
                 Ok(seq) => Value(EventParser::globbed_paths(seq)),
                 Err(u) => Invalid(u.to_string()),
@@ -97,5 +108,17 @@ where
                 .at(n.pos().into())
             })
             .collect()
+    }
+
+    fn inputs(root: &YamlMap<R>) -> PossumMap<String, on::WorkflowInput> {
+        todo!()
+    }
+
+    fn outputs(root: &YamlMap<R>) -> PossumMap<String, on::WorkflowOutput> {
+        todo!()
+    }
+
+    fn secrets(root: &YamlMap<R>) -> PossumNode<on::InheritedSecret> {
+        todo!()
     }
 }
