@@ -5,13 +5,6 @@ use yaml_peg::Node as YamlNode;
 use super::ast::{PossumNode, PossumNodeKind};
 use crate::document::DocumentPointer;
 
-pub fn unify<T>(result: Result<T, T>) -> T {
-    match result {
-        Ok(t) => t,
-        Err(t) => t,
-    }
-}
-
 #[derive(Debug)]
 pub enum ParseFailure {
     InvalidDocument(PError),
@@ -44,7 +37,7 @@ where
     };
 
     let root = documents.remove(0);
-    Ok(parser.parse_node(&root).at(root.pos().into()))
+    Ok(parser.parse_node(&root).at(root.pos()))
 }
 
 pub trait Parser<'a, R, T>

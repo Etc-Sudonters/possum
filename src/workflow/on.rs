@@ -153,9 +153,8 @@ impl EventKind {
 }
 
 possum_node_type!(
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     struct WorkflowInput {
-        name: String,
         description: String,
         default: WorkflowInputDefault,
         required: bool,

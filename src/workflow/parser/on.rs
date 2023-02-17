@@ -30,7 +30,7 @@ where
         match YamlKind::from_yaml_node(root) {
             Map => Value(Self::configured_events(root.extract_map().unwrap()).into()),
             Seq => Value(Self::event_names(root.extract_seq().unwrap()).into()),
-            Str => Value(Self::event_name(root).at(root.pos().into()).into()),
+            Str => Value(Self::event_name(root).at(root.pos()).into()),
             n @ _ => Invalid(
                 ExpectedYaml::AnyOf(vec![Map, Seq, Str])
                     .but_found(n)
@@ -52,8 +52,8 @@ where
         root.into_iter()
             .map(|(kind, event)| {
                 (
-                    Self::event_kind(kind.yaml()).at(kind.pos().into()),
-                    EventParser::new().parse_node(event).at(event.pos().into()),
+                    Self::event_kind(kind.yaml()).at(kind.pos()),
+                    EventParser::new().parse_node(event).at(event.pos()),
                 )
             })
             .collect()
@@ -61,7 +61,7 @@ where
 
     fn event_names(root: &YamlSeq<R>) -> PossumSeq<on::EventKind> {
         root.into_iter()
-            .map(|n| Self::event_name(&n).at(n.pos().into()))
+            .map(|n| Self::event_name(&n).at(n.pos()))
             .collect()
     }
 

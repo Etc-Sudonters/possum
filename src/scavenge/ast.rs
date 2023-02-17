@@ -30,8 +30,11 @@ pub enum PossumNodeKind<T> {
 }
 
 impl<T> PossumNodeKind<T> {
-    pub fn at(self, location: DocumentPointer) -> PossumNode<T> {
-        PossumNode::new(location, self)
+    pub fn at<D>(self, location: D) -> PossumNode<T>
+    where
+        D: Into<DocumentPointer>,
+    {
+        PossumNode::new(location.into(), self)
     }
 
     pub fn invalid(&self) -> bool {

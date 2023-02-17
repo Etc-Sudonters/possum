@@ -1,6 +1,5 @@
 use crate::scavenge::ast::{PossumMap, PossumNode, PossumNodeKind, PossumSeq};
 use crate::scavenge::extraction::Extract;
-use crate::scavenge::parser::unify;
 use crate::scavenge::Parser;
 use crate::workflow::on::{self, Globbed};
 use std::marker::PhantomData;
@@ -72,16 +71,26 @@ where
             }
             "inputs" => {
                 event.inputs = Some(
-                    unify(
-                        value
-                            .extract_map()
-                            .map_err(|e| Invalid(e.to_string()))
-                            .map(|i| Value(Self::inputs(i))),
-                    )
-                    .at(value.pos().into()),
+                    value
+                        .extract_map()
+                        .map_or_else(
+                            |err| Invalid(err.to_string()),
+                            |inputs| Value(Self::inputs(inputs)),
+                        )
+                        .at(value.pos()),
                 );
             }
-            "outputs" => {}
+            "outputs" => {
+                event.outputs = Some(
+                    value
+                        .extract_map()
+                        .map_or_else(
+                            |err| Invalid(err.to_string()),
+                            |out| Value(Self::outputs(out)),
+                        )
+                        .at(value.pos()),
+                );
+            }
             "secrets" => {}
             _ => {}
         }
@@ -94,7 +103,7 @@ where
                 Ok(seq) => Value(EventParser::globbed_paths(seq)),
                 Err(u) => Invalid(u.to_string()),
             }
-            .at(root.pos().into())
+            .at(root.pos())
         }
     }
 
@@ -105,7 +114,7 @@ where
                     Ok(s) => PossumNodeKind::Value(Globbed::new(s)),
                     Err(u) => PossumNodeKind::Invalid(u.to_string()),
                 }
-                .at(n.pos().into())
+                .at(n.pos())
             })
             .collect()
     }

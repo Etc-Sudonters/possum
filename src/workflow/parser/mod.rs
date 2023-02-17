@@ -1,4 +1,5 @@
 mod event;
+mod input;
 mod on;
 use yaml_peg::repr::Repr;
 use yaml_peg::{Map, Node as YamlNode};
@@ -67,7 +68,7 @@ where
             }
             "on" => {
                 let on = on::OnParser::new().parse_node(value);
-                self.workflow.on = Some(on.at(value.pos().into()));
+                self.workflow.on = Some(on.at(value.pos()));
             }
             "jobs" => {
                 self.jobs(value);
@@ -90,7 +91,7 @@ where
             Ok(s) => PossumNodeKind::Value(s.to_owned()),
             Err(e) => PossumNodeKind::Invalid(e.to_string()),
         }
-        .at(n.pos().into())
+        .at(n.pos())
     }
 
     fn run_name(&mut self, n: &YamlNode<R>) -> PossumNode<String> {
@@ -98,7 +99,7 @@ where
             Ok(s) => PossumNodeKind::Expr(s.to_owned()),
             Err(e) => PossumNodeKind::Invalid(e.to_string()),
         }
-        .at(n.pos().into())
+        .at(n.pos())
     }
 
     fn jobs(&mut self, n: &YamlNode<R>) {}
