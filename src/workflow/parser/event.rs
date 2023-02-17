@@ -1,3 +1,4 @@
+use super::input::InputParser;
 use crate::scavenge::ast::{PossumMap, PossumNode, PossumNodeKind, PossumSeq};
 use crate::scavenge::extraction::Extract;
 use crate::scavenge::Parser;
@@ -91,7 +92,17 @@ where
                         .at(value.pos()),
                 );
             }
-            "secrets" => {}
+            "secrets" => {
+                event.secrets = Some(
+                    value
+                        .extract_map()
+                        .map_or_else(
+                            |unexpected| Invalid(unexpected.to_string()),
+                            |secrets| Value(Self::secrets(secrets)),
+                        )
+                        .at(value.pos()),
+                );
+            }
             _ => {}
         }
 
@@ -120,14 +131,52 @@ where
     }
 
     fn inputs(root: &YamlMap<R>) -> PossumMap<String, on::WorkflowInput> {
-        todo!()
+        use PossumNodeKind::*;
+        let mut inputs = PossumMap::empty();
+        for (key, value) in root.iter() {
+            let k = key
+                .extract_str()
+                .map_or_else(|u| Invalid(u.to_string()), |s| Value(s.to_owned()))
+                .at(key.pos());
+
+            let v = InputParser::new().parse_node(value).at(value.pos());
+
+            inputs.insert(k, v)
+        }
+        inputs
     }
 
     fn outputs(root: &YamlMap<R>) -> PossumMap<String, on::WorkflowOutput> {
-        todo!()
+        use PossumNodeKind::*;
+        let outputs = PossumMap::empty();
+        for (key, value) in root.iter() {
+            let k = key
+                .extract_str()
+                .map_or_else(
+                    |unexpected| Invalid(unexpected.to_string()),
+                    |key| Value(key.to_owned()),
+                )
+                .at(key.pos());
+
+            let v = match value.extract_map() {
+                Ok(m) => Self::output(m),
+                Err(u) => Invalid(u.to_string()),
+            }
+            .at(value.pos());
+        }
+        outputs
     }
 
-    fn secrets(root: &YamlMap<R>) -> PossumNode<on::InheritedSecret> {
+    fn output(map: &YamlMap<R>) -> PossumNodeKind<on::WorkflowOutput> {
+        use PossumNodeKind::*;
+        let mut output = on::WorkflowOutput::default();
+
+        for (key, value) in map.iter() {}
+
+        PossumNodeKind::Value(output)
+    }
+
+    fn secrets(root: &YamlMap<R>) -> PossumMap<String, on::InheritedSecret> {
         todo!()
     }
 }

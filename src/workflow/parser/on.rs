@@ -27,10 +27,10 @@ where
     {
         use PossumNodeKind::{Invalid, Value};
         use YamlKind::{Map, Seq, Str};
-        match YamlKind::from_yaml_node(root) {
-            Map => Value(Self::configured_events(root.extract_map().unwrap()).into()),
-            Seq => Value(Self::event_names(root.extract_seq().unwrap()).into()),
-            Str => Value(Self::event_name(root).at(root.pos()).into()),
+        match root.yaml() {
+            Yaml::Map(m) => Value(Self::configured_events(m)),
+            Yaml::Seq(s) => Value(Self::event_names(s).into()),
+            Yaml::Str(_) => Value(Self::event_name(root).at(root.pos()).into()),
             n @ _ => Invalid(
                 ExpectedYaml::AnyOf(vec![Map, Seq, Str])
                     .but_found(n)
@@ -52,7 +52,7 @@ where
         root.into_iter()
             .map(|(kind, event)| {
                 (
-                    Self::event_kind(kind.yaml()).at(kind.pos()),
+                    Self::event_name(kind).at(kind.pos()),
                     EventParser::new().parse_node(event).at(event.pos()),
                 )
             })
@@ -65,20 +65,7 @@ where
             .collect()
     }
 
-    fn event_name(root: &YamlNode<R>) -> PossumNodeKind<on::EventKind> {
-        use PossumNodeKind::Invalid;
-        use YamlKind::Str;
-        match YamlKind::from_yaml_node(root) {
-            Str => Self::event_kind(root.yaml()),
-            _ => Invalid(
-                ExpectedYaml::Only(Str)
-                    .but_found(YamlKind::from_yaml_node(&root))
-                    .to_string(),
-            ),
-        }
-    }
-
-    fn event_kind(n: &Yaml<R>) -> PossumNodeKind<on::EventKind> {
+    fn event_name(n: &YamlNode<R>) -> PossumNodeKind<on::EventKind> {
         use on::BadEvent::Unknown;
         use PossumNodeKind::{Invalid, Value};
         match n.extract_str() {

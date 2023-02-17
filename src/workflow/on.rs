@@ -147,7 +147,7 @@ pub enum EventKind {
 }
 
 impl EventKind {
-    pub fn what_to_name(raw: &str) -> Result<EventKind, BadEvent> {
+    pub fn fromstr(raw: &str) -> Result<EventKind, BadEvent> {
         EventKind::from_str(raw).map_err(|_| BadEvent::Unknown(raw.to_owned()))
     }
 }
@@ -165,12 +165,12 @@ possum_node_type!(
 
 #[derive(Debug)]
 pub enum WorkflowInputDefault {
-    Str(PossumNode<String>),
-    Number(PossumNode<i64>),
-    Bool(PossumNode<bool>),
+    Str(String),
+    Number(String),
+    Bool(bool),
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum::EnumString)]
 pub enum WorkflowInputType {
     Str,
     Number,
@@ -179,9 +179,8 @@ pub enum WorkflowInputType {
 }
 
 possum_node_type!(
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     struct WorkflowOutput {
-        name: String,
         description: String,
         value: String,
     }
@@ -190,7 +189,6 @@ possum_node_type!(
 possum_node_type!(
     #[derive(Debug)]
     struct InheritedSecret {
-        name: String,
         description: String,
         required: bool,
     }
