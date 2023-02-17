@@ -1,7 +1,7 @@
 use yaml_peg::repr::Repr;
 use yaml_peg::{Node as YamlNode, Yaml};
 
-#[derive(Debug, strum::Display, PartialEq, Eq)]
+#[derive(Clone, Debug, strum::Display, PartialEq, Eq)]
 pub enum YamlKind {
     Map,
     Seq,

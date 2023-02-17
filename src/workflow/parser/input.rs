@@ -1,9 +1,10 @@
-use crate::scavenge::ast::PossumNodeKind;
+use crate::scavenge::ast::{PossumNodeKind, PossumSeq};
 use crate::scavenge::extraction::Extract;
 use crate::scavenge::Parser;
 use crate::workflow::on;
 use std::marker::PhantomData;
 use yaml_peg::repr::Repr;
+use yaml_peg::Seq as YamlSeq;
 
 pub struct InputParser<'a, R>
 where
@@ -20,13 +21,19 @@ where
     where
         R: yaml_peg::repr::Repr,
     {
+        use PossumNodeKind::*;
         let mut input = on::WorkflowInput::default();
 
         for (key, value) in root.extract_map().unwrap().iter() {
             match key.extract_str() {
                 Ok(s) => match s.to_lowercase().as_str() {
                     "description" => {
-                        input.description = Some(PossumNodeKind::Empty.at(value.pos()));
+                        input.description = Some(
+                            value
+                                .extract_str()
+                                .map_or_else(|u| Invalid(u.to_string()), |s| Value(s.to_owned()))
+                                .at(value.pos()),
+                        );
                     }
                     "default" => {
                         input.default = Some(PossumNodeKind::Empty.at(value.pos()));
@@ -38,7 +45,15 @@ where
                         input.input_type = Some(PossumNodeKind::Empty.at(value.pos()));
                     }
                     "choices" => {
-                        input.choices = Some(PossumNodeKind::Empty.at(value.pos()));
+                        input.choices = Some(
+                            value
+                                .extract_seq()
+                                .map_or_else(
+                                    |unexpected| Invalid(unexpected.to_string()),
+                                    |choices| Value(Self::choices(choices)),
+                                )
+                                .at(value.pos()),
+                        );
                     }
                     _ => {}
                 },
@@ -56,5 +71,9 @@ where
 {
     pub fn new() -> InputParser<'a, R> {
         InputParser { _x: PhantomData }
+    }
+
+    fn choices(root: &YamlSeq<R>) -> PossumSeq<String> {
+        todo!()
     }
 }

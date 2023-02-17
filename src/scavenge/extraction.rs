@@ -19,6 +19,52 @@ impl Display for UnexpectedYaml {
     }
 }
 
+pub trait IntoYamlKind {
+    fn into_yaml_kind(&self) -> YamlKind;
+}
+
+impl<R> IntoYamlKind for &Yaml<R>
+where
+    R: Repr,
+{
+    fn into_yaml_kind(&self) -> YamlKind {
+        use yaml_peg::Yaml::*;
+
+        match self {
+            Null => YamlKind::Null,
+            Map(_) => YamlKind::Map,
+            Seq(_) => YamlKind::Seq,
+            Bool(_) => YamlKind::Bool,
+            Int(_) | Float(_) => YamlKind::Number,
+            Str(_) => YamlKind::Str,
+            Alias(_) => YamlKind::Alias,
+        }
+    }
+}
+
+impl<R> IntoYamlKind for YamlNode<R>
+where
+    R: Repr,
+{
+    fn into_yaml_kind(&self) -> YamlKind {
+        self.yaml().into_yaml_kind()
+    }
+}
+impl<R> IntoYamlKind for &YamlNode<R>
+where
+    R: Repr,
+{
+    fn into_yaml_kind(&self) -> YamlKind {
+        self.yaml().into_yaml_kind()
+    }
+}
+
+impl IntoYamlKind for YamlKind {
+    fn into_yaml_kind(&self) -> YamlKind {
+        self.clone()
+    }
+}
+
 #[derive(Debug)]
 pub enum ExpectedYaml {
     Only(YamlKind),
@@ -28,11 +74,11 @@ pub enum ExpectedYaml {
 impl ExpectedYaml {
     pub fn but_found<Y>(self, n: Y) -> UnexpectedYaml
     where
-        Y: Into<YamlKind>,
+        Y: IntoYamlKind,
     {
         UnexpectedYaml {
             expected: self,
-            unexpected: n.into(),
+            unexpected: n.into_yaml_kind(),
         }
     }
 }
@@ -64,6 +110,7 @@ where
     fn extract_map(&'a self) -> Extraction<&'a Map<R>>;
     fn extract_str(&'a self) -> Extraction<&'a str>;
     fn extract_seq(&'a self) -> Extraction<&'a Seq<R>>;
+    fn extract_bool(&'a self) -> Extraction<&'a bool>;
 }
 
 impl<'a, R> Extract<'a, R> for YamlNode<R>
@@ -81,6 +128,10 @@ where
     fn extract_seq(&'a self) -> Extraction<&'a Seq<R>> {
         self.yaml().extract_seq()
     }
+
+    fn extract_bool(&'a self) -> Extraction<&'a bool> {
+        self.yaml().extract_bool()
+    }
 }
 
 impl<'a, R> Extract<'a, R> for Yaml<R>
@@ -90,21 +141,28 @@ where
     fn extract_map(&'a self) -> Extraction<&'a Map<R>> {
         match self {
             Yaml::Map(m) => Ok(m),
-            _ => Err(ExpectedYaml::Only(YamlKind::Map).but_found(YamlKind::from_yaml(self))),
+            _ => Err(ExpectedYaml::Only(YamlKind::Map).but_found(self)),
         }
     }
 
     fn extract_str(&'a self) -> Extraction<&'a str> {
         match self {
             Yaml::Str(s) => Ok(s),
-            _ => Err(ExpectedYaml::Only(YamlKind::Str).but_found(YamlKind::from_yaml(self))),
+            _ => Err(ExpectedYaml::Only(YamlKind::Str).but_found(self)),
         }
     }
 
     fn extract_seq(&'a self) -> Extraction<&'a Seq<R>> {
         match self {
             Yaml::Seq(s) => Ok(s),
-            _ => Err(ExpectedYaml::Only(YamlKind::Seq).but_found(YamlKind::from_yaml(self))),
+            _ => Err(ExpectedYaml::Only(YamlKind::Seq).but_found(self)),
+        }
+    }
+
+    fn extract_bool(&'a self) -> Extraction<&'a bool> {
+        match self {
+            Yaml::Bool(b) => Ok(b),
+            _ => Err(ExpectedYaml::Only(YamlKind::Bool).but_found(self)),
         }
     }
 }
