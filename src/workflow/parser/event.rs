@@ -1,7 +1,10 @@
 use super::input::InputParser;
+use crate::document::Annotation;
+use crate::document::Annotations;
+use crate::document::AsDocumentPointer;
 use crate::scavenge::ast::{PossumMap, PossumNode, PossumNodeKind, PossumSeq};
 use crate::scavenge::extraction::Extract;
-use crate::scavenge::Parser;
+use crate::scavenge::{Parser, UnexpectedKey};
 use crate::workflow::on::{self, Globbed};
 use std::marker::PhantomData;
 use yaml_peg::repr::Repr;
@@ -12,6 +15,7 @@ where
     R: Repr + 'a,
 {
     _x: PhantomData<&'a R>,
+    annotations: &'a mut Annotations,
 }
 
 impl<'a, R> Parser<'a, R, on::Event> for EventParser<'a, R>
@@ -33,25 +37,38 @@ impl<'a, R> EventParser<'a, R>
 where
     R: Repr + 'a,
 {
-    pub fn new() -> EventParser<'a, R> {
-        EventParser { _x: PhantomData }
+    pub fn new(a: &'a mut Annotations) -> EventParser<'a, R> {
+        EventParser {
+            _x: PhantomData,
+            annotations: a,
+        }
+    }
+
+    fn annotate<A>(&mut self, annotation: A)
+    where
+        A: Into<Annotation>,
+    {
+        self.annotations.add(annotation);
     }
 
     fn parse_map(&mut self, root: &YamlMap<R>) -> on::Event {
         let mut evt = on::Event::new();
         for (key, value) in root.iter() {
             match key.extract_str() {
-                Ok(s) => self.visit_event_key(&mut evt, s.to_lowercase(), value),
-                Err(err) => panic!("{err}"),
+                Ok(s) => self.visit_event_key(&mut evt, s.to_lowercase(), value, key),
+                Err(err) => self.annotate(Annotation::error(key, &err)),
             }
         }
 
         evt
     }
 
-    fn visit_event_key(&mut self, event: &mut on::Event, key: String, value: &YamlNode<R>) {
+    fn visit_event_key<P>(&mut self, event: &mut on::Event, key: String, value: &YamlNode<R>, p: &P)
+    where
+        P: AsDocumentPointer,
+    {
         use PossumNodeKind::{Invalid, Value};
-        match key.as_str() {
+        match key.to_lowercase().as_str() {
             "branches" => {
                 event.branches = Some(get_globbed_paths(value));
             }
@@ -87,7 +104,7 @@ where
                         .extract_map()
                         .map_or_else(
                             |err| Invalid(err.to_string()),
-                            |out| Value(Self::outputs(out)),
+                            |out| Value(self.outputs(out)),
                         )
                         .at(value.pos()),
                 );
@@ -103,7 +120,7 @@ where
                         .at(value.pos()),
                 );
             }
-            s => panic!("unexpected key {s}"),
+            s => self.annotate(Annotation::error(p, &UnexpectedKey::new(s))),
         }
 
         fn get_globbed_paths<'a, R>(root: &YamlNode<R>) -> PossumNode<PossumSeq<Globbed>>
@@ -146,7 +163,7 @@ where
         inputs
     }
 
-    fn outputs(root: &YamlMap<R>) -> PossumMap<String, on::WorkflowOutput> {
+    fn outputs(&mut self, root: &YamlMap<R>) -> PossumMap<String, on::WorkflowOutput> {
         use PossumNodeKind::*;
         let mut outputs = PossumMap::empty();
         for (key, value) in root.iter() {
@@ -159,7 +176,7 @@ where
                 .at(key.pos());
 
             let v = match value.extract_map() {
-                Ok(m) => Self::output(m),
+                Ok(m) => self.output(m),
                 Err(u) => Invalid(u.to_string()),
             }
             .at(value.pos());
@@ -192,7 +209,7 @@ where
         secrets
     }
 
-    fn output(map: &YamlMap<R>) -> PossumNodeKind<on::WorkflowOutput> {
+    fn output(&mut self, map: &YamlMap<R>) -> PossumNodeKind<on::WorkflowOutput> {
         use PossumNodeKind::*;
         let mut output = on::WorkflowOutput::default();
 
@@ -215,7 +232,7 @@ where
                     }
                     s => panic!("unexpected key {s}"),
                 },
-                Err(unexpected) => panic!("{unexpected}"),
+                Err(unexpected) => self.annotate(Annotation::fatal(key, &unexpected)),
             }
         }
 

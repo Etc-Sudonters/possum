@@ -52,7 +52,7 @@ where
         for (key, value) in m.into_iter() {
             match key.extract_str() {
                 Ok(s) => self.visit_root_key(s.to_lowercase(), key, value),
-                Err(err) => self.annotate(Annotation::fatal(key.pos().into(), &err.to_string())),
+                Err(err) => self.annotate(Annotation::fatal(key, &err.to_string())),
             }
         }
     }
@@ -67,23 +67,23 @@ where
                 self.workflow.run_name = Some(self.run_name(value));
             }
             "on" => {
-                let on = on::OnParser::new().parse_node(value);
+                let on = on::OnParser::new(self.annotations).parse_node(value);
                 self.workflow.on = Some(on.at(value.pos()));
             }
             "jobs" => {
                 self.jobs(value);
             }
             _ => {
-                self.annotate(Annotation::warn(
-                    key.pos().into(),
-                    format!("unknown key {raw_key}").as_str(),
-                ));
+                self.annotate(Annotation::warn(key, &format!("unknown key {raw_key}")));
             }
         }
     }
 
-    fn annotate(&mut self, a: Annotation) {
-        self.annotations.add(a)
+    fn annotate<A>(&mut self, a: A)
+    where
+        A: Into<Annotation>,
+    {
+        self.annotations.add(a.into())
     }
 
     fn name(&mut self, n: &YamlNode<R>) -> PossumNode<String> {

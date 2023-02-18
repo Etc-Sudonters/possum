@@ -1,4 +1,4 @@
-use super::document::DocumentPointer;
+use super::document::{AsDocumentPointer, DocumentPointer};
 use std::convert::AsRef;
 use std::fmt::Display;
 use strum::Display;
@@ -11,8 +11,11 @@ impl Annotations {
         Annotations(Vec::with_capacity(16))
     }
 
-    pub fn add(&mut self, a: Annotation) {
-        self.0.push(a)
+    pub fn add<A>(&mut self, a: A)
+    where
+        A: Into<Annotation>,
+    {
+        self.0.push(a.into())
     }
 
     pub fn entries(&self) -> std::slice::Iter<Annotation> {
@@ -44,23 +47,43 @@ impl AsRef<DocumentPointer> for Annotation {
 }
 
 impl Annotation {
-    fn from_parts(level: AnnotationLevel, msg: &str, pointer: DocumentPointer) -> Annotation {
-        Annotation(level, msg.to_owned(), pointer)
+    fn from_parts<P, I>(level: AnnotationLevel, msg: &I, pointer: &P) -> Annotation
+    where
+        P: AsDocumentPointer,
+        I: ToString,
+    {
+        Annotation(level, msg.to_string(), pointer.as_document_pointer())
     }
 
-    pub fn info(pointer: DocumentPointer, msg: &str) -> Annotation {
+    pub fn info<P, I>(pointer: &P, msg: &I) -> Annotation
+    where
+        P: AsDocumentPointer,
+        I: ToString,
+    {
         Annotation::from_parts(AnnotationLevel::Info, msg, pointer)
     }
 
-    pub fn warn(pointer: DocumentPointer, msg: &str) -> Annotation {
+    pub fn warn<P, I>(pointer: &P, msg: &I) -> Annotation
+    where
+        P: AsDocumentPointer,
+        I: ToString,
+    {
         Annotation::from_parts(AnnotationLevel::Warn, msg, pointer)
     }
 
-    pub fn error(pointer: DocumentPointer, msg: &str) -> Annotation {
+    pub fn error<P, I>(pointer: &P, msg: &I) -> Annotation
+    where
+        P: AsDocumentPointer,
+        I: ToString,
+    {
         Annotation::from_parts(AnnotationLevel::Error, msg, pointer)
     }
 
-    pub fn fatal(pointer: DocumentPointer, msg: &str) -> Annotation {
+    pub fn fatal<P, I>(pointer: &P, msg: &I) -> Annotation
+    where
+        P: AsDocumentPointer,
+        I: ToString,
+    {
         Annotation::from_parts(AnnotationLevel::Fatal, msg, pointer)
     }
 }

@@ -4,6 +4,21 @@ use yaml_peg::Node as YamlNode;
 
 use super::ast::{PossumNode, PossumNodeKind};
 use crate::document::DocumentPointer;
+use std::fmt::Display;
+
+pub struct UnexpectedKey<'a>(&'a str);
+
+impl<'a> UnexpectedKey<'a> {
+    pub fn new(s: &'a str) -> UnexpectedKey<'a> {
+        UnexpectedKey(s)
+    }
+}
+
+impl<'a> Display for UnexpectedKey<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Debug)]
 pub enum ParseFailure {

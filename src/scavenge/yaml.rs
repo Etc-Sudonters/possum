@@ -1,3 +1,4 @@
+use crate::document::AsDocumentPointer;
 use yaml_peg::repr::Repr;
 use yaml_peg::{Node as YamlNode, Yaml};
 
@@ -43,5 +44,14 @@ where
 {
     fn into(self) -> YamlKind {
         YamlKind::from_yaml_node(&self)
+    }
+}
+
+impl<R> AsDocumentPointer for YamlNode<R>
+where
+    R: Repr,
+{
+    fn as_document_pointer(&self) -> crate::document::DocumentPointer {
+        self.pos().into()
     }
 }

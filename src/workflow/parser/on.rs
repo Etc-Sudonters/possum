@@ -1,4 +1,5 @@
 use super::event::EventParser;
+use crate::document::Annotations;
 use crate::scavenge::ast::{PossumNodeKind, PossumSeq};
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
 use crate::scavenge::parser::Parser;
@@ -9,26 +10,26 @@ use std::str::FromStr;
 use yaml_peg::repr::Repr;
 use yaml_peg::{Map as YamlMap, Node as YamlNode, Seq as YamlSeq, Yaml};
 
-#[derive(Default)]
 pub struct OnParser<'a, R>
 where
     R: Repr + 'a,
 {
     _x: PhantomData<&'a R>,
+    annotations: &'a mut Annotations,
 }
 
 impl<'a, R> Parser<'a, R, on::Trigger> for OnParser<'a, R>
 where
     R: Repr + 'a,
 {
-    fn parse_node(self, root: &YamlNode<R>) -> PossumNodeKind<on::Trigger>
+    fn parse_node(mut self, root: &YamlNode<R>) -> PossumNodeKind<on::Trigger>
     where
         R: Repr,
     {
         use PossumNodeKind::{Invalid, Value};
         use YamlKind::{Map, Seq, Str};
         match root.yaml() {
-            Yaml::Map(m) => Value(Self::configured_events(m)),
+            Yaml::Map(m) => Value(self.configured_events(m)),
             Yaml::Seq(s) => Value(Self::event_names(s).into()),
             Yaml::Str(_) => Value(Self::event_name(root).at(root.pos()).into()),
             n @ _ => Invalid(
@@ -44,16 +45,21 @@ impl<'a, R> OnParser<'a, R>
 where
     R: Repr + 'a,
 {
-    pub fn new() -> OnParser<'a, R> {
-        OnParser { _x: PhantomData }
+    pub fn new(a: &'a mut Annotations) -> OnParser<'a, R> {
+        OnParser {
+            _x: PhantomData,
+            annotations: a,
+        }
     }
 
-    fn configured_events(root: &YamlMap<R>) -> on::Trigger {
+    fn configured_events(&mut self, root: &YamlMap<R>) -> on::Trigger {
         root.into_iter()
             .map(|(kind, event)| {
                 (
                     Self::event_name(kind).at(kind.pos()),
-                    EventParser::new().parse_node(event).at(event.pos()),
+                    EventParser::new(self.annotations)
+                        .parse_node(event)
+                        .at(event.pos()),
                 )
             })
             .collect()
