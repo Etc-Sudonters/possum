@@ -76,7 +76,7 @@ where
             "jobs" => {
                 self.workflow.jobs = Some(self.jobs(value));
             }
-            s => self.annotate(UnexpectedKey::new(&s.to_owned(), value)),
+            s => self.annotate(UnexpectedKey::at(&s.to_owned(), value)),
         }
     }
 

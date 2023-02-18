@@ -120,7 +120,7 @@ where
                         .at(value),
                 );
             }
-            s => self.annotate(UnexpectedKey::new(&s.to_owned(), p)),
+            s => self.annotate(UnexpectedKey::at(&s.to_owned(), p)),
         }
 
         fn get_globbed_paths<'a, R>(root: &YamlNode<R>) -> PossumNode<PossumSeq<Globbed>>
@@ -230,7 +230,7 @@ where
                     "value" => {
                         output.value = Some(v);
                     }
-                    s => self.annotate(UnexpectedKey::new(&s.to_owned(), key)),
+                    s => self.annotate(UnexpectedKey::at(&s.to_owned(), key)),
                 },
                 Err(unexpected) => self.annotate(Annotation::fatal(key, &unexpected)),
             }
@@ -265,7 +265,7 @@ where
 
                         secret.required = Some(required);
                     }
-                    s => self.annotate(UnexpectedKey::new(&s.to_owned(), value)),
+                    s => self.annotate(UnexpectedKey::at(&s.to_owned(), value)),
                 },
             }
         }

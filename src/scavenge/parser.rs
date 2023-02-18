@@ -16,7 +16,7 @@ where
     P: AsDocumentPointer,
     S: Display,
 {
-    pub fn new(s: &'a S, p: &'a P) -> UnexpectedKey<'a, S, P> {
+    pub fn at(s: &'a S, p: &'a P) -> UnexpectedKey<'a, S, P> {
         UnexpectedKey(s, p)
     }
 }

@@ -1,11 +1,12 @@
-use crate::document::{Annotation, Annotations};
+use crate::document::{Annotation, Annotations, AsDocumentPointer};
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::Extract;
-use crate::scavenge::Parser;
+use crate::scavenge::{Parser, UnexpectedKey};
 use crate::workflow::job::Job;
 use std::marker::PhantomData;
 use yaml_peg::repr::Repr;
 use yaml_peg::Map as YamlMap;
+use yaml_peg::Node as YamlNode;
 
 pub struct JobParser<'a, R>
 where
@@ -24,7 +25,7 @@ where
         R: Repr,
     {
         match root.extract_map() {
-            Ok(m) => self.parse(m),
+            Ok(m) => PossumNodeKind::Value(self.parse(m)),
             Err(e) => PossumNodeKind::Invalid(e.to_string()),
         }
     }
@@ -48,9 +49,39 @@ where
         self.annotations.add(annotation.into())
     }
 
-    fn parse(&mut self, root: &YamlMap<R>) -> PossumNodeKind<Job> {
+    fn parse(&mut self, root: &YamlMap<R>) -> Job {
         let mut job = Job::default();
 
-        PossumNodeKind::Value(job)
+        for (key, value) in root.iter() {
+            match key.extract_str() {
+                Ok(s) => self.job_key(&mut job, s, value, key),
+                Err(err) => self.annotate(err.at(key)),
+            }
+        }
+
+        job
+    }
+
+    fn job_key<P>(&mut self, event: &mut Job, key: &str, value: &YamlNode<R>, p: &P)
+    where
+        P: AsDocumentPointer,
+    {
+        match key.to_lowercase().as_str() {
+            "name" => {}
+            "permissions" => {}
+            "needs" => {}
+            "if" => {}
+            "runs-on" => {}
+            "environment" => {}
+            "concurrency" => {}
+            "outputs" => {}
+            "env" => {}
+            "steps" => {}
+            "timeout-minutes" => {}
+            "continue-on-error" => {}
+            "uses" => {}
+            "with" => {}
+            s => self.annotate(UnexpectedKey::at(&s.to_owned(), p)),
+        }
     }
 }
