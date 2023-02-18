@@ -1,12 +1,14 @@
 mod event;
 mod input;
+mod job;
 mod on;
 use yaml_peg::repr::Repr;
 use yaml_peg::{Map, Node as YamlNode};
 
+use super::job::Job;
 use super::Workflow;
 use crate::document::{Annotation, Annotations};
-use crate::scavenge::ast::{PossumNode, PossumNodeKind};
+use crate::scavenge::ast::{PossumMap, PossumNode, PossumNodeKind};
 use crate::scavenge::extraction::Extract;
 use crate::scavenge::parser::Parser;
 use crate::scavenge::UnexpectedKey;
@@ -53,7 +55,7 @@ where
         for (key, value) in m.into_iter() {
             match key.extract_str() {
                 Ok(s) => self.visit_root_key(s.to_lowercase(), key, value),
-                Err(err) => self.annotate(Annotation::fatal(key, &err.to_string())),
+                Err(err) => self.annotate(err.at(key)),
             }
         }
     }
@@ -72,7 +74,7 @@ where
                 self.workflow.on = Some(on.at(value));
             }
             "jobs" => {
-                self.jobs(value);
+                self.workflow.jobs = Some(self.jobs(value));
             }
             s => self.annotate(UnexpectedKey::new(&s.to_owned(), value)),
         }
@@ -101,5 +103,29 @@ where
         .at(n)
     }
 
-    fn jobs(&mut self, n: &YamlNode<R>) {}
+    fn jobs(&mut self, n: &YamlNode<R>) -> PossumNode<PossumMap<String, Job>> {
+        use PossumNodeKind::*;
+        match n.extract_map() {
+            Ok(root) => {
+                let mut jobs = PossumMap::empty();
+                for (name, job) in root.iter() {
+                    let k = match name.extract_str() {
+                        Ok(s) => Value(s.to_owned()),
+                        Err(u) => Invalid(u.to_string()),
+                    }
+                    .at(name);
+
+                    let job = job::JobParser::new(self.annotations)
+                        .parse_node(job)
+                        .at(job);
+
+                    jobs.insert(k, job);
+                }
+
+                Value(jobs)
+            }
+            Err(u) => PossumNodeKind::Invalid(u.to_string()),
+        }
+        .at(n)
+    }
 }
