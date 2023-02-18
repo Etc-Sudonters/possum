@@ -1,4 +1,5 @@
 pub mod job;
+pub mod lints;
 pub mod on;
 pub mod parser;
 
@@ -12,7 +13,7 @@ possum_node_type! {
         name: String,
         run_name: String,
         on: on::Trigger,
-        jobs: job::Job,
+        jobs: PossumMap<String, job::Job>,
     }
 }
 

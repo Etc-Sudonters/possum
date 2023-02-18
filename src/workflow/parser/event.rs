@@ -265,7 +265,7 @@ where
 
                         secret.required = Some(required);
                     }
-                    s => panic!("unexpected key {s}"),
+                    s => self.annotate(UnexpectedKey::new(&s.to_owned(), value)),
                 },
             }
         }

@@ -9,6 +9,7 @@ use crate::document::{Annotation, Annotations};
 use crate::scavenge::ast::{PossumNode, PossumNodeKind};
 use crate::scavenge::extraction::Extract;
 use crate::scavenge::parser::Parser;
+use crate::scavenge::UnexpectedKey;
 use std::marker::PhantomData;
 use std::string::ToString;
 
@@ -73,9 +74,7 @@ where
             "jobs" => {
                 self.jobs(value);
             }
-            _ => {
-                self.annotate(Annotation::warn(key, &format!("unknown key {raw_key}")));
-            }
+            s => self.annotate(UnexpectedKey::new(&s.to_owned(), value)),
         }
     }
 

@@ -5,7 +5,6 @@ use crate::scavenge::ast::*;
 possum_node_type!(
     #[derive(Debug)]
     struct Job {
-        id: String,
         name: String,
         permissions: Permission,
         needs: PossumSeq<String>,
