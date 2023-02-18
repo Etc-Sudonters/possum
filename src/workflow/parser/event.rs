@@ -115,12 +115,12 @@ where
                         .extract_map()
                         .map_or_else(
                             |unexpected| Invalid(unexpected.to_string()),
-                            |secrets| Value(Self::secrets(secrets)),
+                            |secrets| Value(self.secrets(secrets)),
                         )
                         .at(value.pos()),
                 );
             }
-            s => self.annotate(Annotation::error(p, &UnexpectedKey::new(s))),
+            s => self.annotate(UnexpectedKey::new(&s.to_owned(), p)),
         }
 
         fn get_globbed_paths<'a, R>(root: &YamlNode<R>) -> PossumNode<PossumSeq<Globbed>>
@@ -186,7 +186,7 @@ where
         outputs
     }
 
-    fn secrets(root: &YamlMap<R>) -> PossumMap<String, on::InheritedSecret> {
+    fn secrets(&mut self, root: &YamlMap<R>) -> PossumMap<String, on::InheritedSecret> {
         use PossumNodeKind::*;
         let mut secrets = PossumMap::empty();
         for (key, secret) in root.iter() {
@@ -199,7 +199,7 @@ where
                 .at(key.pos());
 
             let v = match secret.extract_map() {
-                Ok(secret) => Self::secret(secret),
+                Ok(secret) => self.secret(secret),
                 Err(unexpected) => Invalid(unexpected.to_string()),
             }
             .at(secret.pos());
@@ -230,7 +230,7 @@ where
                     "value" => {
                         output.value = Some(v);
                     }
-                    s => panic!("unexpected key {s}"),
+                    s => self.annotate(UnexpectedKey::new(&s.to_owned(), key)),
                 },
                 Err(unexpected) => self.annotate(Annotation::fatal(key, &unexpected)),
             }
@@ -239,13 +239,13 @@ where
         PossumNodeKind::Value(output)
     }
 
-    fn secret(map: &YamlMap<R>) -> PossumNodeKind<on::InheritedSecret> {
+    fn secret(&mut self, map: &YamlMap<R>) -> PossumNodeKind<on::InheritedSecret> {
         use PossumNodeKind::*;
         let mut secret = on::InheritedSecret::default();
 
         for (key, value) in map.iter() {
             match key.extract_str() {
-                Err(unexpected) => panic!("{unexpected}"),
+                Err(unexpected) => self.annotate(unexpected.at(key)),
                 Ok(name) => match name.to_lowercase().as_str() {
                     "description" => {
                         let description = match value.extract_str() {

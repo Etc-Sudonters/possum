@@ -50,7 +50,7 @@ impl Annotation {
     fn from_parts<P, I>(level: AnnotationLevel, msg: &I, pointer: &P) -> Annotation
     where
         P: AsDocumentPointer,
-        I: ToString,
+        I: Display,
     {
         Annotation(level, msg.to_string(), pointer.as_document_pointer())
     }
@@ -58,7 +58,7 @@ impl Annotation {
     pub fn info<P, I>(pointer: &P, msg: &I) -> Annotation
     where
         P: AsDocumentPointer,
-        I: ToString,
+        I: Display,
     {
         Annotation::from_parts(AnnotationLevel::Info, msg, pointer)
     }
@@ -66,7 +66,7 @@ impl Annotation {
     pub fn warn<P, I>(pointer: &P, msg: &I) -> Annotation
     where
         P: AsDocumentPointer,
-        I: ToString,
+        I: Display,
     {
         Annotation::from_parts(AnnotationLevel::Warn, msg, pointer)
     }
@@ -74,7 +74,7 @@ impl Annotation {
     pub fn error<P, I>(pointer: &P, msg: &I) -> Annotation
     where
         P: AsDocumentPointer,
-        I: ToString,
+        I: Display,
     {
         Annotation::from_parts(AnnotationLevel::Error, msg, pointer)
     }
@@ -82,7 +82,7 @@ impl Annotation {
     pub fn fatal<P, I>(pointer: &P, msg: &I) -> Annotation
     where
         P: AsDocumentPointer,
-        I: ToString,
+        I: Display,
     {
         Annotation::from_parts(AnnotationLevel::Fatal, msg, pointer)
     }

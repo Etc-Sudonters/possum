@@ -3,20 +3,31 @@ use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
 
 use super::ast::{PossumNode, PossumNodeKind};
-use crate::document::DocumentPointer;
+use crate::document::{Annotation, AsDocumentPointer, DocumentPointer};
 use std::fmt::Display;
 
-pub struct UnexpectedKey<'a>(&'a str);
+pub struct UnexpectedKey<'a, S, P>(&'a S, &'a P)
+where
+    P: AsDocumentPointer,
+    S: Display;
 
-impl<'a> UnexpectedKey<'a> {
-    pub fn new(s: &'a str) -> UnexpectedKey<'a> {
-        UnexpectedKey(s)
+impl<'a, S, P> UnexpectedKey<'a, S, P>
+where
+    P: AsDocumentPointer,
+    S: Display,
+{
+    pub fn new(s: &'a S, p: &'a P) -> UnexpectedKey<'a, S, P> {
+        UnexpectedKey(s, p)
     }
 }
 
-impl<'a> Display for UnexpectedKey<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl<'a, S, P> Into<Annotation> for UnexpectedKey<'a, S, P>
+where
+    P: AsDocumentPointer,
+    S: Display,
+{
+    fn into(self) -> Annotation {
+        Annotation::error(self.1, self.0)
     }
 }
 

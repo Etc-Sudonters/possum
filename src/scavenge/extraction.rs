@@ -1,3 +1,5 @@
+use crate::document::{Annotation, AsDocumentPointer};
+
 use super::yaml::YamlKind;
 use std::fmt::Display;
 use yaml_peg::repr::Repr;
@@ -16,6 +18,15 @@ impl Display for UnexpectedYaml {
             "expected {} but found {}",
             self.expected, self.unexpected
         )
+    }
+}
+
+impl UnexpectedYaml {
+    pub fn at<P>(self, at: &P) -> Annotation
+    where
+        P: AsDocumentPointer,
+    {
+        Annotation::fatal(at, &self)
     }
 }
 
