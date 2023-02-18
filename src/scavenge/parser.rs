@@ -63,7 +63,7 @@ where
     };
 
     let root = documents.remove(0);
-    Ok(parser.parse_node(&root).at(root.pos()))
+    Ok(parser.parse_node(&root).at(root))
 }
 
 pub trait Parser<'a, R, T>

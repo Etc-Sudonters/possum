@@ -4,6 +4,12 @@ use std::convert::From;
 #[derive(Debug, Copy, Clone)]
 pub struct DocumentPointer(pub(crate) usize);
 
+impl AsDocumentPointer for DocumentPointer {
+    fn as_document_pointer(&self) -> DocumentPointer {
+        self.clone()
+    }
+}
+
 pub trait AsDocumentPointer {
     fn as_document_pointer(&self) -> DocumentPointer;
 }

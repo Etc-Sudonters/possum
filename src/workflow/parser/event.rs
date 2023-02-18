@@ -95,7 +95,7 @@ where
                             |err| Invalid(err.to_string()),
                             |inputs| Value(Self::inputs(inputs)),
                         )
-                        .at(value.pos()),
+                        .at(value),
                 );
             }
             "outputs" => {
@@ -106,7 +106,7 @@ where
                             |err| Invalid(err.to_string()),
                             |out| Value(self.outputs(out)),
                         )
-                        .at(value.pos()),
+                        .at(value),
                 );
             }
             "secrets" => {
@@ -117,7 +117,7 @@ where
                             |unexpected| Invalid(unexpected.to_string()),
                             |secrets| Value(self.secrets(secrets)),
                         )
-                        .at(value.pos()),
+                        .at(value),
                 );
             }
             s => self.annotate(UnexpectedKey::new(&s.to_owned(), p)),
@@ -131,7 +131,7 @@ where
                 Ok(seq) => Value(EventParser::globbed_paths(seq)),
                 Err(u) => Invalid(u.to_string()),
             }
-            .at(root.pos())
+            .at(root)
         }
     }
 
@@ -142,7 +142,7 @@ where
                     Ok(s) => PossumNodeKind::Value(Globbed::new(s)),
                     Err(u) => PossumNodeKind::Invalid(u.to_string()),
                 }
-                .at(n.pos())
+                .at(n)
             })
             .collect()
     }
@@ -154,9 +154,9 @@ where
             let k = key
                 .extract_str()
                 .map_or_else(|u| Invalid(u.to_string()), |s| Value(s.to_owned()))
-                .at(key.pos());
+                .at(key);
 
-            let v = InputParser::new().parse_node(value).at(value.pos());
+            let v = InputParser::new().parse_node(value).at(value);
 
             inputs.insert(k, v)
         }
@@ -173,13 +173,13 @@ where
                     |unexpected| Invalid(unexpected.to_string()),
                     |key| Value(key.to_owned()),
                 )
-                .at(key.pos());
+                .at(key);
 
             let v = match value.extract_map() {
                 Ok(m) => self.output(m),
                 Err(u) => Invalid(u.to_string()),
             }
-            .at(value.pos());
+            .at(value);
 
             outputs.insert(k, v);
         }
@@ -196,13 +196,13 @@ where
                     |unexpected| Invalid(unexpected.to_string()),
                     |key| Value(key.to_owned()),
                 )
-                .at(key.pos());
+                .at(key);
 
             let v = match secret.extract_map() {
                 Ok(secret) => self.secret(secret),
                 Err(unexpected) => Invalid(unexpected.to_string()),
             }
-            .at(secret.pos());
+            .at(secret);
 
             secrets.insert(k, v);
         }
@@ -220,7 +220,7 @@ where
                     |unexpected| Invalid(unexpected.to_string()),
                     |v| Value(v.to_owned()),
                 )
-                .at(value.pos());
+                .at(value);
 
             match key.extract_str() {
                 Ok(s) => match s.to_lowercase().as_str() {
@@ -252,7 +252,7 @@ where
                             Ok(s) => Value(s.to_owned()),
                             Err(u) => Invalid(u.to_string()),
                         }
-                        .at(value.pos());
+                        .at(value);
 
                         secret.description = Some(description);
                     }
@@ -261,7 +261,7 @@ where
                             Ok(b) => Value(b.clone()),
                             Err(u) => Invalid(u.to_string()),
                         }
-                        .at(value.pos());
+                        .at(value);
 
                         secret.required = Some(required);
                     }

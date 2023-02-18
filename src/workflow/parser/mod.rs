@@ -69,7 +69,7 @@ where
             }
             "on" => {
                 let on = on::OnParser::new(self.annotations).parse_node(value);
-                self.workflow.on = Some(on.at(value.pos()));
+                self.workflow.on = Some(on.at(value));
             }
             "jobs" => {
                 self.jobs(value);
@@ -90,7 +90,7 @@ where
             Ok(s) => PossumNodeKind::Value(s.to_owned()),
             Err(e) => PossumNodeKind::Invalid(e.to_string()),
         }
-        .at(n.pos())
+        .at(n)
     }
 
     fn run_name(&mut self, n: &YamlNode<R>) -> PossumNode<String> {
@@ -98,7 +98,7 @@ where
             Ok(s) => PossumNodeKind::Expr(s.to_owned()),
             Err(e) => PossumNodeKind::Invalid(e.to_string()),
         }
-        .at(n.pos())
+        .at(n)
     }
 
     fn jobs(&mut self, n: &YamlNode<R>) {}

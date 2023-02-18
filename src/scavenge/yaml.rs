@@ -47,11 +47,20 @@ where
     }
 }
 
-impl<R> AsDocumentPointer for YamlNode<R>
+impl<R> AsDocumentPointer for &YamlNode<R>
 where
     R: Repr,
 {
     fn as_document_pointer(&self) -> crate::document::DocumentPointer {
         self.pos().into()
+    }
+}
+
+impl<R> AsDocumentPointer for YamlNode<R>
+where
+    R: Repr,
+{
+    fn as_document_pointer(&self) -> crate::document::DocumentPointer {
+        AsDocumentPointer::as_document_pointer(&self)
     }
 }

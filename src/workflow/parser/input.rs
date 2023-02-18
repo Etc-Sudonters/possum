@@ -1,3 +1,4 @@
+use crate::document::AsDocumentPointer;
 use crate::scavenge::ast::{PossumNodeKind, PossumSeq};
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
 use crate::scavenge::yaml::YamlKind;
@@ -37,11 +38,11 @@ where
                                     |unexpected| Invalid(unexpected.to_string()),
                                     |description| Value(description.to_owned()),
                                 )
-                                .at(value.pos()),
+                                .at(value),
                         );
                     }
                     "default" => {
-                        input.default = Some(Self::default_value(value).at(value.pos()));
+                        input.default = Some(Self::default_value(value).at(value));
                     }
                     "required" => {
                         input.required = Some(
@@ -49,7 +50,7 @@ where
                                 .extract_bool()
                                 .map(Clone::clone)
                                 .map_or_else(|unexpected| Invalid(unexpected.to_string()), Value)
-                                .at(value.pos()),
+                                .at(value),
                         );
                     }
                     "type" => {
@@ -67,7 +68,7 @@ where
                                         )
                                     },
                                 )
-                                .at(value.pos()),
+                                .at(value),
                         );
                     }
                     "choices" => {
@@ -78,7 +79,7 @@ where
                                     |unexpected| Invalid(unexpected.to_string()),
                                     |choices| Value(Self::choices(choices)),
                                 )
-                                .at(value.pos()),
+                                .at(value),
                         );
                     }
                     _ => {}
@@ -101,7 +102,7 @@ where
 
     fn choices(root: &YamlSeq<R>) -> PossumSeq<String> {
         root.into_iter()
-            .map(|n| (n.extract_str(), n.pos()))
+            .map(|n| (n.extract_str(), n.as_document_pointer()))
             .map(|(node, pos)| {
                 node.map_or_else(
                     |unexpected| PossumNodeKind::Invalid(unexpected.to_string()),

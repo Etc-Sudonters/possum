@@ -1,4 +1,4 @@
-use crate::document::DocumentPointer;
+use crate::document::{AsDocumentPointer, DocumentPointer};
 use std::iter::{FromIterator, IntoIterator};
 
 #[derive(Debug)]
@@ -32,9 +32,9 @@ pub enum PossumNodeKind<T> {
 impl<T> PossumNodeKind<T> {
     pub fn at<D>(self, location: D) -> PossumNode<T>
     where
-        D: Into<DocumentPointer>,
+        D: AsDocumentPointer,
     {
-        PossumNode::new(location.into(), self)
+        PossumNode::new(location.as_document_pointer(), self)
     }
 
     pub fn invalid(&self) -> bool {
