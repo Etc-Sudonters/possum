@@ -42,7 +42,7 @@ where
         for (key, value) in root.iter() {
             match key.extract_str() {
                 Ok(s) => self.visit_event_key(&mut evt, s.to_lowercase(), value),
-                Err(err) => todo!(),
+                Err(err) => panic!("{err}"),
             }
         }
 
@@ -103,7 +103,7 @@ where
                         .at(value.pos()),
                 );
             }
-            _ => {}
+            s => panic!("unexpected key {s}"),
         }
 
         fn get_globbed_paths<'a, R>(root: &YamlNode<R>) -> PossumNode<PossumSeq<Globbed>>
@@ -148,7 +148,7 @@ where
 
     fn outputs(root: &YamlMap<R>) -> PossumMap<String, on::WorkflowOutput> {
         use PossumNodeKind::*;
-        let outputs = PossumMap::empty();
+        let mut outputs = PossumMap::empty();
         for (key, value) in root.iter() {
             let k = key
                 .extract_str()
@@ -163,20 +163,96 @@ where
                 Err(u) => Invalid(u.to_string()),
             }
             .at(value.pos());
+
+            outputs.insert(k, v);
         }
         outputs
+    }
+
+    fn secrets(root: &YamlMap<R>) -> PossumMap<String, on::InheritedSecret> {
+        use PossumNodeKind::*;
+        let mut secrets = PossumMap::empty();
+        for (key, secret) in root.iter() {
+            let k = key
+                .extract_str()
+                .map_or_else(
+                    |unexpected| Invalid(unexpected.to_string()),
+                    |key| Value(key.to_owned()),
+                )
+                .at(key.pos());
+
+            let v = match secret.extract_map() {
+                Ok(secret) => Self::secret(secret),
+                Err(unexpected) => Invalid(unexpected.to_string()),
+            }
+            .at(secret.pos());
+
+            secrets.insert(k, v);
+        }
+        secrets
     }
 
     fn output(map: &YamlMap<R>) -> PossumNodeKind<on::WorkflowOutput> {
         use PossumNodeKind::*;
         let mut output = on::WorkflowOutput::default();
 
-        for (key, value) in map.iter() {}
+        for (key, value) in map.iter() {
+            let v = value
+                .extract_str()
+                .map_or_else(
+                    |unexpected| Invalid(unexpected.to_string()),
+                    |v| Value(v.to_owned()),
+                )
+                .at(value.pos());
+
+            match key.extract_str() {
+                Ok(s) => match s.to_lowercase().as_str() {
+                    "description" => {
+                        output.description = Some(v);
+                    }
+                    "value" => {
+                        output.value = Some(v);
+                    }
+                    s => panic!("unexpected key {s}"),
+                },
+                Err(unexpected) => panic!("{unexpected}"),
+            }
+        }
 
         PossumNodeKind::Value(output)
     }
 
-    fn secrets(root: &YamlMap<R>) -> PossumMap<String, on::InheritedSecret> {
-        todo!()
+    fn secret(map: &YamlMap<R>) -> PossumNodeKind<on::InheritedSecret> {
+        use PossumNodeKind::*;
+        let mut secret = on::InheritedSecret::default();
+
+        for (key, value) in map.iter() {
+            match key.extract_str() {
+                Err(unexpected) => panic!("{unexpected}"),
+                Ok(name) => match name.to_lowercase().as_str() {
+                    "description" => {
+                        let description = match value.extract_str() {
+                            Ok(s) => Value(s.to_owned()),
+                            Err(u) => Invalid(u.to_string()),
+                        }
+                        .at(value.pos());
+
+                        secret.description = Some(description);
+                    }
+                    "required" => {
+                        let required = match value.extract_bool() {
+                            Ok(b) => Value(b.clone()),
+                            Err(u) => Invalid(u.to_string()),
+                        }
+                        .at(value.pos());
+
+                        secret.required = Some(required);
+                    }
+                    s => panic!("unexpected key {s}"),
+                },
+            }
+        }
+
+        Value(secret)
     }
 }

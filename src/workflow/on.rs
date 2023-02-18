@@ -187,7 +187,7 @@ possum_node_type!(
 );
 
 possum_node_type!(
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     struct InheritedSecret {
         description: String,
         required: bool,
