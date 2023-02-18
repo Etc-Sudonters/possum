@@ -3,7 +3,7 @@ use super::Permission;
 use crate::scavenge::ast::*;
 
 possum_node_type!(
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     struct Job {
         name: String,
         permissions: Permission,

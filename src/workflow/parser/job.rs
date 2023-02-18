@@ -1,4 +1,4 @@
-use crate::document::Annotations;
+use crate::document::{Annotation, Annotations};
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::Extract;
 use crate::scavenge::Parser;
@@ -41,7 +41,16 @@ where
         }
     }
 
+    fn annotate<A>(&mut self, annotation: A)
+    where
+        A: Into<Annotation>,
+    {
+        self.annotations.add(annotation.into())
+    }
+
     fn parse(&mut self, root: &YamlMap<R>) -> PossumNodeKind<Job> {
-        PossumNodeKind::Empty
+        let mut job = Job::default();
+
+        PossumNodeKind::Value(job)
     }
 }
