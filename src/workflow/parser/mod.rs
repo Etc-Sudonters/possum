@@ -2,6 +2,7 @@ mod event;
 mod input;
 mod job;
 mod on;
+mod step;
 use yaml_peg::repr::Repr;
 use yaml_peg::{Map, Node as YamlNode};
 

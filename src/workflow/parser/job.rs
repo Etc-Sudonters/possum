@@ -1,9 +1,10 @@
 use crate::document::{Annotation, Annotations, AsDocumentPointer};
-use crate::scavenge::ast::{PossumNodeKind, PossumSeq};
+use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
 use crate::scavenge::yaml::YamlKind;
 use crate::scavenge::{Parser, UnexpectedKey};
-use crate::workflow::job::Job;
+use crate::workflow::job::{self, Job};
+use crate::workflow::parser::step::StepParser;
 use std::marker::PhantomData;
 use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
@@ -69,36 +70,81 @@ where
     {
         use PossumNodeKind::*;
         match key.to_lowercase().as_str() {
-            "name" => {
-                job.name = Some(
-                    value
-                        .extract_str()
-                        .map_or_else(
-                            |unexpected| Invalid(unexpected.to_string()),
-                            |v| Value(v.to_owned()),
-                        )
-                        .at(value),
-                );
+            "permissions" => {
+                todo!();
             }
-            "permissions" => {}
+            "concurrency" => {
+                todo!();
+            }
+            "env" => {
+                todo!();
+            }
+            "with" => {
+                todo!()
+            }
+            "steps" => {
+                job.steps = Some({
+                    match value.extract_seq() {
+                        Err(u) => Invalid(u.to_string()),
+                        Ok(seq) => Value(
+                            seq.iter()
+                                .map(|step| {
+                                    StepParser::new(self.annotations).parse_node(step).at(step)
+                                })
+                                .collect(),
+                        ),
+                    }
+                    .at(value)
+                });
+            }
+            "environment" => {
+                let environment = match value.yaml() {
+                    Yaml::Str(s) => Value(job::Environment::Bare(s.to_owned())),
+                    Yaml::Map(m) => {
+                        let mut env_name = None;
+                        let mut env_url = None;
+
+                        for (key, value) in m.iter() {
+                            match key.extract_str() {
+                                Err(u) => self.annotate(u.at(key)),
+                                Ok(s) => match s.to_lowercase().as_str() {
+                                    "name" => env_name = Some(Value(s.to_owned()).at(value)),
+                                    "url" => env_url = Some(Value(s.to_owned()).at(value)),
+                                    _ => self.annotate(UnexpectedKey::at(&s.to_owned(), key)),
+                                },
+                            }
+                        }
+
+                        Value(job::Environment::Env {
+                            name: env_name,
+                            url: env_url,
+                        })
+                    }
+                    unexpected @ _ => Invalid(
+                        ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Map])
+                            .but_found(unexpected)
+                            .to_string(),
+                    ),
+                }
+                .at(value);
+
+                job.environment = Some(environment);
+            }
+            "name" => {
+                let name: PossumNodeKind<String> =
+                    value.extract_str().map(ToOwned::to_owned).into();
+                job.name = Some(name.at(value));
+            }
             "needs" => {
                 let needs = match value.yaml() {
-                    Yaml::Str(s) => {
-                        // this sucks and is too difficult
-                        let need = Value(s.to_owned()).at(value);
-                        let mut needs = PossumSeq::empty();
-                        needs.push(need);
-                        Value(needs)
-                    }
+                    Yaml::Str(s) => Value(Value(s.to_owned()).at(value).into()),
                     Yaml::Seq(seq) => {
                         let needs = seq
                             .iter()
-                            .map(|need| {
-                                match need.extract_str() {
-                                    Ok(s) => Value(s.to_owned()),
-                                    Err(u) => Invalid(u.to_string()),
-                                }
-                                .at(need)
+                            .map(|root| {
+                                let need: PossumNodeKind<String> =
+                                    root.extract_str().map(ToOwned::to_owned).into();
+                                need.at(root)
                             })
                             .collect();
                         Value(needs)
@@ -126,26 +172,18 @@ where
             }
             "runs-on" => {
                 let runs_on = match value.yaml() {
-                    Yaml::Str(s) => {
-                        // this sucks and is too difficult
-                        let runner = Value(s.to_owned()).at(value);
-                        let mut runners = PossumSeq::empty();
-                        runners.push(runner);
-                        Value(runners)
-                    }
-                    Yaml::Seq(seq) => {
-                        let runners = seq
-                            .iter()
+                    // this is just incomprehensible gibberish. to_owned value of value of into
+                    // value at my butt what the fuck
+                    Yaml::Str(s) => Value(Value(s.to_owned()).at(value).into()),
+                    Yaml::Seq(seq) => Value(
+                        seq.iter()
                             .map(|runner| {
-                                match runner.extract_str() {
-                                    Ok(s) => Value(s.to_owned()),
-                                    Err(u) => Invalid(u.to_string()),
-                                }
-                                .at(runner)
+                                let r: PossumNodeKind<String> =
+                                    runner.extract_str().map(ToOwned::to_owned).into();
+                                r.at(runner)
                             })
-                            .collect();
-                        Value(runners)
-                    }
+                            .collect(),
+                    ),
                     unexpected @ _ => Invalid(
                         ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Seq])
                             .but_found(unexpected)
@@ -156,29 +194,17 @@ where
 
                 job.runs_on = Some(runs_on);
             }
-            "environment" => {}
-            "concurrency" => {}
             "outputs" => {
                 let outputs = match value.extract_map() {
                     Err(u) => Invalid(u.to_string()),
                     Ok(map) => Value(
                         map.iter()
-                            .map(|(k, v)| {
-                                let k = k
-                                    .extract_str()
-                                    .map_or_else(
-                                        |u| Invalid(u.to_string()),
-                                        |v| Value(v.to_owned()),
-                                    )
-                                    .at(k);
-                                let v = v
-                                    .extract_str()
-                                    .map_or_else(
-                                        |u| Invalid(u.to_string()),
-                                        |v| Value(v.to_owned()),
-                                    )
-                                    .at(v);
-                                (k, v)
+                            .map(|(key, value)| {
+                                let k: PossumNodeKind<String> =
+                                    key.extract_str().map(ToOwned::to_owned).into();
+                                let v: PossumNodeKind<String> =
+                                    value.extract_str().map(ToOwned::to_owned).into();
+                                (k.at(key), v.at(value))
                             })
                             .collect(),
                     ),
@@ -187,36 +213,19 @@ where
 
                 job.outputs = Some(outputs);
             }
-            "env" => {}
-            "steps" => {}
             "timeout-minutes" => {
-                job.timeout_minutes = Some(
-                    value
-                        .extract_number()
-                        .map_or_else(|u| Invalid(u.to_string()), |v| Value(v.clone()))
-                        .at(value),
-                );
+                let timeout: PossumNodeKind<f64> = value.extract_number().into();
+                job.timeout_minutes = Some(timeout.at(value));
             }
             "continue-on-error" => {
-                job.continue_on_error = Some(
-                    value
-                        .extract_bool()
-                        .map_or_else(|u| Invalid(u.to_string()), |v| Value(v.to_owned()))
-                        .at(value),
-                );
+                let coe: PossumNodeKind<bool> = value.extract_bool().into();
+                job.continue_on_error = Some(coe.at(value));
             }
             "uses" => {
-                job.uses = Some(
-                    value
-                        .extract_str()
-                        .map_or_else(
-                            |unexpected| Invalid(unexpected.to_string()),
-                            |v| Value(v.to_owned()),
-                        )
-                        .at(value),
-                );
+                let uses: PossumNodeKind<String> =
+                    value.extract_str().map(ToOwned::to_owned).into();
+                job.uses = Some(uses.at(value));
             }
-            "with" => {}
             s => self.annotate(UnexpectedKey::at(&s.to_owned(), p)),
         }
     }

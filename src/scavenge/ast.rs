@@ -82,6 +82,14 @@ pub struct PossumSeq<T> {
     entries: Vec<PossumNode<T>>,
 }
 
+impl<T> Into<PossumSeq<T>> for PossumNode<T> {
+    fn into(self) -> PossumSeq<T> {
+        PossumSeq {
+            entries: vec![self],
+        }
+    }
+}
+
 impl<T> IntoIterator for PossumSeq<T> {
     type Item = PossumNode<T>;
     type IntoIter = std::vec::IntoIter<Self::Item>;

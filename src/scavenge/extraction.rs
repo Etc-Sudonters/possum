@@ -1,5 +1,6 @@
 use crate::document::{Annotation, AsDocumentPointer};
 
+use super::ast::PossumNodeKind;
 use super::yaml::YamlKind;
 use std::fmt::Display;
 use std::num::ParseIntError;
@@ -206,4 +207,13 @@ fn i64_from_yaml(raw: &str) -> Result<i64, ParseIntError> {
         return i64::from_str_radix(&raw.replace("0o", ""), 8);
     }
     raw.parse()
+}
+
+impl<T> Into<PossumNodeKind<T>> for Extraction<T> {
+    fn into(self) -> PossumNodeKind<T> {
+        match self {
+            Ok(t) => PossumNodeKind::Value(t),
+            Err(u) => PossumNodeKind::Invalid(u.to_string()),
+        }
+    }
 }

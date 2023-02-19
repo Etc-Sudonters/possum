@@ -18,30 +18,21 @@ possum_node_type!(
         timeout_minutes: f64,
         continue_on_error: bool,
         uses: String,
-        with: With,
+        with: PossumMap<String, String>,
     }
 );
 
 #[derive(Debug)]
 pub enum Environment {
-    Bare(PossumNode<String>),
+    Bare(String),
     Env {
-        name: PossumNode<String>,
-        url: PossumNode<String>,
-    },
-}
-
-#[derive(Debug)]
-pub enum With {
-    Args(PossumNode<PossumMap<String, String>>),
-    Container {
-        args: PossumNode<String>,
-        entrypoint: PossumNode<String>,
+        name: Option<PossumNode<String>>,
+        url: Option<PossumNode<String>>,
     },
 }
 
 possum_node_type!(
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     struct Step {
         id: String,
         cond: String,
@@ -49,15 +40,6 @@ possum_node_type!(
         uses: String,
         run: String,
         shell: String,
-        with: StepWith,
+        with: PossumMap<String, String>,
     }
 );
-
-#[derive(Debug)]
-pub enum StepWith {
-    Container {
-        args: PossumNode<String>,
-        entrypoint: PossumNode<String>,
-    },
-    Args(PossumMap<String, String>),
-}
