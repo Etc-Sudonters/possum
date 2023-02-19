@@ -48,7 +48,6 @@ where
                         input.required = Some(
                             value
                                 .extract_bool()
-                                .map(Clone::clone)
                                 .map_or_else(|unexpected| Invalid(unexpected.to_string()), Value)
                                 .at(value),
                         );

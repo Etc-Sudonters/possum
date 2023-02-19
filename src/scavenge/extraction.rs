@@ -2,6 +2,7 @@ use crate::document::{Annotation, AsDocumentPointer};
 
 use super::yaml::YamlKind;
 use std::fmt::Display;
+use std::num::ParseIntError;
 use yaml_peg::repr::Repr;
 use yaml_peg::{Map, Node as YamlNode, Seq, Yaml};
 
@@ -121,7 +122,8 @@ where
     fn extract_map(&'a self) -> Extraction<&'a Map<R>>;
     fn extract_str(&'a self) -> Extraction<&'a str>;
     fn extract_seq(&'a self) -> Extraction<&'a Seq<R>>;
-    fn extract_bool(&'a self) -> Extraction<&'a bool>;
+    fn extract_bool(&'a self) -> Extraction<bool>;
+    fn extract_number(&'a self) -> Extraction<f64>;
 }
 
 impl<'a, R> Extract<'a, R> for YamlNode<R>
@@ -140,8 +142,13 @@ where
         self.yaml().extract_seq()
     }
 
-    fn extract_bool(&'a self) -> Extraction<&'a bool> {
+    fn extract_bool(&'a self) -> Extraction<bool> {
         self.yaml().extract_bool()
+    }
+
+    fn extract_number(&'a self) -> Extraction<f64> {
+        self.as_number()
+            .map_err(|_| ExpectedYaml::Only(YamlKind::Number).but_found(self))
     }
 }
 
@@ -170,10 +177,33 @@ where
         }
     }
 
-    fn extract_bool(&'a self) -> Extraction<&'a bool> {
+    fn extract_bool(&'a self) -> Extraction<bool> {
         match self {
-            Yaml::Bool(b) => Ok(b),
+            Yaml::Bool(true) => Ok(true),
+            Yaml::Bool(false) => Ok(false),
             _ => Err(ExpectedYaml::Only(YamlKind::Bool).but_found(self)),
         }
     }
+
+    fn extract_number(&'a self) -> Extraction<f64> {
+        match self {
+            Yaml::Int(raw) => match i64_from_yaml(raw) {
+                Ok(i) => Ok(i as f64),
+                Err(_) => Err(ExpectedYaml::Only(YamlKind::Number).but_found(YamlKind::Str)),
+            },
+            Yaml::Float(raw) => raw
+                .parse()
+                .map_err(|_| ExpectedYaml::Only(YamlKind::Number).but_found(YamlKind::Str)),
+            u @ _ => Err(ExpectedYaml::Only(YamlKind::Number).but_found(u)),
+        }
+    }
+}
+
+fn i64_from_yaml(raw: &str) -> Result<i64, ParseIntError> {
+    if raw.starts_with("0x") {
+        return i64::from_str_radix(&raw.replace("0x", ""), 16);
+    } else if raw.starts_with("0o") {
+        return i64::from_str_radix(&raw.replace("0o", ""), 8);
+    }
+    raw.parse()
 }

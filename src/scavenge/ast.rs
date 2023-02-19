@@ -54,14 +54,26 @@ pub struct PossumMap<K, V> {
 impl<K, V> PossumMap<K, V> {
     pub fn empty() -> PossumMap<K, V> {
         PossumMap {
-            keys: PossumSeq::new(),
-            values: PossumSeq::new(),
+            keys: PossumSeq::empty(),
+            values: PossumSeq::empty(),
         }
     }
 
     pub fn insert(&mut self, k: PossumNode<K>, v: PossumNode<V>) {
         self.keys.push(k);
         self.values.push(v);
+    }
+}
+
+impl<K, V> FromIterator<(PossumNode<K>, PossumNode<V>)> for PossumMap<K, V> {
+    fn from_iter<T: IntoIterator<Item = (PossumNode<K>, PossumNode<V>)>>(iter: T) -> Self {
+        let mut map = PossumMap::empty();
+
+        for (k, v) in iter.into_iter() {
+            map.insert(k, v)
+        }
+
+        map
     }
 }
 
@@ -93,7 +105,7 @@ impl<T> Into<PossumSeq<T>> for Vec<PossumNode<T>> {
 }
 
 impl<T> PossumSeq<T> {
-    pub fn new() -> PossumSeq<T> {
+    pub fn empty() -> PossumSeq<T> {
         PossumSeq {
             entries: Vec::new(),
         }
