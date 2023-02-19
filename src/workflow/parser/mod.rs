@@ -1,7 +1,9 @@
+mod concurrency;
 mod event;
 mod input;
 mod job;
 mod on;
+mod permissions;
 mod step;
 use yaml_peg::repr::Repr;
 use yaml_peg::{Map, Node as YamlNode};
@@ -22,19 +24,15 @@ where
 {
     _x: PhantomData<R>,
     annotations: &'a mut Annotations,
-    workflow: Workflow,
 }
 
 impl<'a, R> Parser<'a, R, Workflow> for WorkflowParser<'a, R>
 where
     R: Repr + 'a,
 {
-    fn parse_node(mut self, root: &YamlNode<R>) -> PossumNodeKind<Workflow> {
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<Workflow> {
         match root.extract_map() {
-            Ok(m) => {
-                self.parse_map(m);
-                PossumNodeKind::Value(self.workflow)
-            }
+            Ok(m) => PossumNodeKind::Value(self.parse_map(m)),
             Err(e) => PossumNodeKind::Invalid(e.to_string()),
         }
     }
@@ -47,35 +45,57 @@ where
     pub fn new(a: &'a mut Annotations) -> WorkflowParser<'a, R> {
         WorkflowParser {
             annotations: a,
-            workflow: Workflow::default(),
             _x: PhantomData,
         }
     }
 
-    fn parse_map(&mut self, m: &Map<R>) {
+    fn parse_map(&mut self, m: &Map<R>) -> Workflow {
+        let mut wf = Workflow::default();
         for (key, value) in m.into_iter() {
             match key.extract_str() {
-                Ok(s) => self.visit_root_key(s.to_lowercase(), key, value),
+                Ok(s) => self.visit_root_key(s.to_lowercase(), key, value, &mut wf),
                 Err(err) => self.annotate(err.at(key)),
             }
         }
+
+        wf
     }
 
-    fn visit_root_key(&mut self, raw_key: String, key: &YamlNode<R>, value: &YamlNode<R>) {
+    fn visit_root_key(
+        &mut self,
+        raw_key: String,
+        key: &YamlNode<R>,
+        value: &YamlNode<R>,
+        workflow: &mut Workflow,
+    ) {
         // we can't currently detect repeated keys ):
         match raw_key.as_str() {
             "name" => {
-                self.workflow.name = Some(self.name(value));
+                workflow.name = Some(self.name(value));
             }
             "run_name" => {
-                self.workflow.run_name = Some(self.run_name(value));
+                workflow.run_name = Some(self.run_name(value));
             }
             "on" => {
                 let on = on::OnParser::new(self.annotations).parse_node(value);
-                self.workflow.on = Some(on.at(value));
+                workflow.on = Some(on.at(value));
             }
             "jobs" => {
-                self.workflow.jobs = Some(self.jobs(value));
+                workflow.jobs = Some(self.jobs(value));
+            }
+            "permissions" => {
+                workflow.permissions = Some(
+                    permissions::PermissionParser::new(self.annotations)
+                        .parse_node(value)
+                        .at(value),
+                );
+            }
+            "concurrency" => {
+                workflow.concurrency = Some(
+                    concurrency::ConcurrencyParser::new(self.annotations)
+                        .parse_node(value)
+                        .at(value),
+                );
             }
             s => self.annotate(UnexpectedKey::at(&s.to_owned(), value)),
         }

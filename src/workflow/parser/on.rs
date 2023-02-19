@@ -22,7 +22,7 @@ impl<'a, R> Parser<'a, R, on::Trigger> for OnParser<'a, R>
 where
     R: Repr + 'a,
 {
-    fn parse_node(mut self, root: &YamlNode<R>) -> PossumNodeKind<on::Trigger>
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::Trigger>
     where
         R: Repr,
     {

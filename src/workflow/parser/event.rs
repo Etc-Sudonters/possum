@@ -22,7 +22,7 @@ impl<'a, R> Parser<'a, R, on::Event> for EventParser<'a, R>
 where
     R: Repr + 'a,
 {
-    fn parse_node(mut self, root: &YamlNode<R>) -> PossumNodeKind<on::Event>
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::Event>
     where
         R: Repr,
     {

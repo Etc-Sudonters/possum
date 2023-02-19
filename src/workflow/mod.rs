@@ -14,6 +14,8 @@ possum_node_type! {
         run_name: String,
         on: on::Trigger,
         jobs: PossumMap<String, job::Job>,
+        permissions: Permission,
+        concurrency: Concurrency,
     }
 }
 
@@ -21,20 +23,21 @@ possum_node_type! {
 pub enum Concurrency {
     Concurrency(String),
     Group {
-        group: PossumNode<String>,
-        cancel_in_progress: PossumNode<bool>,
+        group: Option<PossumNode<String>>,
+        cancel_in_progress: Option<PossumNode<bool>>,
     },
 }
 
 #[derive(Debug)]
 pub enum Permission {
-    GlobalGrant(PossumNode<Grant>),
+    GlobalGrant(Grant),
     GlobalRevoke,
-    IndividualGrants(PossumNode<PossumMap<String, Grant>>),
+    IndividualGrants(PossumMap<String, Grant>),
 }
 
 #[derive(Debug)]
 pub enum Grant {
     Read,
     Write,
+    Deny,
 }

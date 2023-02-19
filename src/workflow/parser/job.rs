@@ -1,5 +1,7 @@
+use super::concurrency::ConcurrencyParser;
+use super::permissions::PermissionParser;
 use crate::document::{Annotation, Annotations, AsDocumentPointer};
-use crate::scavenge::ast::PossumNodeKind;
+use crate::scavenge::ast::{PossumMap, PossumNodeKind};
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
 use crate::scavenge::yaml::YamlKind;
 use crate::scavenge::{Parser, UnexpectedKey};
@@ -22,7 +24,7 @@ impl<'a, R> Parser<'a, R, Job> for JobParser<'a, R>
 where
     R: Repr + 'a,
 {
-    fn parse_node(mut self, root: &yaml_peg::Node<R>) -> PossumNodeKind<Job>
+    fn parse_node(&mut self, root: &yaml_peg::Node<R>) -> PossumNodeKind<Job>
     where
         R: Repr,
     {
@@ -71,16 +73,60 @@ where
         use PossumNodeKind::*;
         match key.to_lowercase().as_str() {
             "permissions" => {
-                todo!();
-            }
-            "concurrency" => {
-                todo!();
+                job.permissions = Some(
+                    PermissionParser::new(self.annotations)
+                        .parse_node(value)
+                        .at(value),
+                );
             }
             "env" => {
-                todo!();
+                job.env = Some({
+                    match value.extract_map() {
+                        Err(u) => Invalid(u.to_string()),
+                        Ok(m) => {
+                            let mut map = PossumMap::empty();
+
+                            for (key, value) in m.iter() {
+                                let k: PossumNodeKind<String> =
+                                    key.extract_str().map(ToOwned::to_owned).into();
+                                let v: PossumNodeKind<String> =
+                                    value.extract_str().map(ToOwned::to_owned).into();
+                                map.insert(k.at(key), v.at(value));
+                            }
+
+                            Value(map)
+                        }
+                    }
+                    .at(value)
+                });
             }
             "with" => {
-                todo!()
+                job.with = Some({
+                    match value.extract_map() {
+                        Err(u) => Invalid(u.to_string()),
+                        Ok(m) => {
+                            let mut map = PossumMap::empty();
+
+                            for (key, value) in m.iter() {
+                                let k: PossumNodeKind<String> =
+                                    key.extract_str().map(ToOwned::to_owned).into();
+                                let v: PossumNodeKind<String> =
+                                    value.extract_str().map(ToOwned::to_owned).into();
+                                map.insert(k.at(key), v.at(value));
+                            }
+
+                            Value(map)
+                        }
+                    }
+                    .at(value)
+                });
+            }
+            "concurrency" => {
+                job.concurrency = Some(
+                    ConcurrencyParser::new(self.annotations)
+                        .parse_node(value)
+                        .at(value),
+                );
             }
             "steps" => {
                 job.steps = Some({

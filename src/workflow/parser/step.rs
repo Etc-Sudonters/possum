@@ -113,6 +113,30 @@ impl StepBuilder {
                     Fallible::Success
                 }
 
+                "env" => {
+                    self.step.env = Some(
+                        match value.extract_map() {
+                            Err(u) => Invalid(u.to_string()),
+                            Ok(m) => {
+                                let mut map = PossumMap::empty();
+
+                                for (key, value) in m.iter() {
+                                    let k: PossumNodeKind<String> =
+                                        key.extract_str().map(ToOwned::to_owned).into();
+                                    let v: PossumNodeKind<String> =
+                                        value.extract_str().map(ToOwned::to_owned).into();
+                                    map.insert(k.at(key), v.at(value));
+                                }
+
+                                Value(map)
+                            }
+                        }
+                        .at(value),
+                    );
+
+                    Fallible::Success
+                }
+
                 k @ _ => Fallible::Failure(UnexpectedKey::at(&k.to_owned(), key).into()),
             },
         }
@@ -137,7 +161,7 @@ impl<'a, R> Parser<'a, R, job::Step> for StepParser<'a, R>
 where
     R: Repr + 'a,
 {
-    fn parse_node(mut self, root: &YamlNode<R>) -> PossumNodeKind<job::Step>
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<job::Step>
     where
         R: Repr,
     {

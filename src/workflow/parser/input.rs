@@ -20,7 +20,7 @@ impl<'a, R> Parser<'a, R, on::WorkflowInput> for InputParser<'a, R>
 where
     R: Repr + 'a,
 {
-    fn parse_node(self, root: &yaml_peg::Node<R>) -> PossumNodeKind<on::WorkflowInput>
+    fn parse_node(&mut self, root: &yaml_peg::Node<R>) -> PossumNodeKind<on::WorkflowInput>
     where
         R: yaml_peg::repr::Repr,
     {

@@ -41,5 +41,6 @@ possum_node_type!(
         run: String,
         shell: String,
         with: PossumMap<String, String>,
+        env: PossumMap<String, String>,
     }
 );
