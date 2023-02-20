@@ -45,8 +45,8 @@ pub fn build(mut root: PathBuf) -> Result<Project, InitFailures> {
             Ok(raw) => {
                 let mut annotations = Annotations::new();
                 let loader: Loader<'_, RcRepr> = yaml_peg::parser::Loader::new(&raw);
-                let parser = WorkflowParser::new(&mut annotations);
-                match possum_parse(loader, parser) {
+                let mut parser = WorkflowParser::new(&mut annotations);
+                match possum_parse(loader, &mut parser) {
                     Ok(workflow) => {
                         project.push(ProjectEntry::Workflow {
                             source: p,

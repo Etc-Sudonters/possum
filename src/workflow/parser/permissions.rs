@@ -4,27 +4,16 @@ use crate::scavenge::extraction::{ExpectedYaml, Extract};
 use crate::scavenge::yaml::YamlKind;
 use crate::scavenge::Parser;
 use crate::workflow::{Grant, Permission};
-use std::marker::PhantomData;
 use yaml_peg::repr::Repr;
 use yaml_peg::Yaml;
 
-pub struct PermissionParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    _x: PhantomData<R>,
+pub struct PermissionParser<'a> {
     annotations: &'a mut Annotations,
 }
 
-impl<'a, R> PermissionParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    pub fn new(a: &'a mut Annotations) -> PermissionParser<'a, R> {
-        PermissionParser {
-            _x: PhantomData,
-            annotations: a,
-        }
+impl<'a> PermissionParser<'a> {
+    pub fn new(a: &'a mut Annotations) -> PermissionParser<'a> {
+        PermissionParser { annotations: a }
     }
 
     fn annotate<A>(&mut self, a: A)
@@ -45,9 +34,9 @@ fn parse_individual_grant(grant: &str) -> PossumNodeKind<Grant> {
     }
 }
 
-impl<'a, R> Parser<'a, R, Permission> for PermissionParser<'a, R>
+impl<'a, R> Parser<R, Permission> for PermissionParser<'a>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &yaml_peg::Node<R>) -> PossumNodeKind<Permission>
     where

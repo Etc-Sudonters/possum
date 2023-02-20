@@ -44,59 +44,82 @@ pub enum ParseFailure {
 
 pub fn parse_single_document<'a, R, T, P>(
     mut loader: Loader<'a, R>,
-    mut parser: P,
+    parser: &mut P,
 ) -> Result<PossumNode<T>, ParseFailure>
 where
-    R: Repr + 'a,
-    P: Parser<'a, R, T>,
+    R: Repr,
+    P: Parser<R, T>,
 {
     let documents = loader
         .parse()
         .map_err(|e| ParseFailure::InvalidDocument(e))?;
 
-    if documents.len() == 0 {
-        return Err(ParseFailure::Empty);
-    } else if documents.len() > 1 {
-        return Err(ParseFailure::TooManyDocuments(
+    if documents.is_empty() {
+        Err(ParseFailure::Empty)?
+    }
+
+    if documents.len() > 1 {
+        Err(ParseFailure::TooManyDocuments(
             documents
                 .iter()
-                .map(|n| DocumentPointer(n.pos() as usize))
+                .map(AsDocumentPointer::as_document_pointer)
                 .collect(),
-        ));
-    };
+        ))?
+    }
 
-    let root = documents.get(0).unwrap();
-    Ok(parser.parse_node(root).at(root))
+    let documents = &documents;
+    let d = documents.get(0).unwrap();
+    Ok(parser.parse_node(d).at(d))
 }
 
-pub trait Parser<'a, R, T>
+pub trait Parser<R, T>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<T>
     where
         R: Repr;
 }
 
+pub struct StrParser<'a>(PhantomData<&'a ()>);
+
+impl<'a> StrParser<'a> {
+    pub fn new() -> StrParser<'a> {
+        StrParser(PhantomData)
+    }
+}
+
+impl<'a, R> Parser<R, &'a str> for StrParser<'a>
+where
+    R: Repr,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<&'a str>
+    where
+        R: Repr,
+    {
+        root.extract_str().into()
+    }
+}
+
 pub struct StringParser;
 
-impl<'a, R> Parser<'a, R, String> for StringParser
+impl<R> Parser<R, String> for StringParser
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<String>
     where
         R: Repr,
     {
-        root.extract_str().map(ToOwned::to_owned).into()
+        TransformParser::new(&mut StrParser::new(), &ToOwned::to_owned).parse_node(root)
     }
 }
 
 pub struct BoolParser;
 
-impl<'a, R> Parser<'a, R, bool> for BoolParser
+impl<R> Parser<R, bool> for BoolParser
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<bool>
     where
@@ -108,17 +131,17 @@ where
 
 pub struct MapParser<'a, R, T>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     _x: PhantomData<R>,
-    parser: &'a mut dyn Parser<'a, R, T>,
+    parser: &'a mut dyn Parser<R, T>,
 }
 
 impl<'a, R, T> MapParser<'a, R, T>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
-    pub fn new(parser: &'a mut dyn Parser<'a, R, T>) -> MapParser<'a, R, T> {
+    pub fn new(parser: &'a mut dyn Parser<R, T>) -> MapParser<R, T> {
         MapParser {
             _x: PhantomData,
             parser,
@@ -126,9 +149,9 @@ where
     }
 }
 
-impl<'a, R, T> Parser<'a, R, PossumMap<String, T>> for MapParser<'a, R, T>
+impl<'a, R, T> Parser<R, PossumMap<String, T>> for MapParser<'a, R, T>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<PossumMap<String, T>>
     where
@@ -153,22 +176,22 @@ where
     }
 }
 
-pub struct SeqParser<'a, R, T>(&'a mut dyn Parser<'a, R, T>)
+pub struct SeqParser<'a, R, T>(&'a mut dyn Parser<R, T>)
 where
-    R: Repr + 'a;
+    R: Repr;
 
 impl<'a, R, T> SeqParser<'a, R, T>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
-    pub fn new(parser: &'a mut dyn Parser<'a, R, T>) -> SeqParser<'a, R, T> {
+    pub fn new(parser: &mut dyn Parser<R, T>) -> SeqParser<R, T> {
         SeqParser(parser)
     }
 }
 
-impl<'a, R, T> Parser<'a, R, PossumSeq<T>> for SeqParser<'a, R, T>
+impl<'a, R, T> Parser<R, PossumSeq<T>> for SeqParser<'a, R, T>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<PossumSeq<T>>
     where
@@ -188,27 +211,27 @@ where
 
 pub struct TransformParser<'a, R, T, U>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
-    parser: &'a mut dyn Parser<'a, R, T>,
+    parser: &'a mut dyn Parser<R, T>,
     transform: &'a dyn Fn(T) -> U,
 }
 
 impl<'a, R, T, U> TransformParser<'a, R, T, U>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     pub fn new(
-        parser: &'a mut dyn Parser<'a, R, T>,
+        parser: &'a mut dyn Parser<R, T>,
         transform: &'a dyn Fn(T) -> U,
     ) -> TransformParser<'a, R, T, U> {
         TransformParser { parser, transform }
     }
 }
 
-impl<'a, R, T, U> Parser<'a, R, U> for TransformParser<'a, R, T, U>
+impl<'a, R, T, U> Parser<R, U> for TransformParser<'a, R, T, U>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<U>
     where
@@ -220,27 +243,27 @@ where
 
 pub struct FlatMapParser<'a, R, T, U>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
-    parser: &'a mut dyn Parser<'a, R, T>,
+    parser: &'a mut dyn Parser<R, T>,
     transform: &'a dyn Fn(T) -> PossumNodeKind<U>,
 }
 
 impl<'a, R, T, U> FlatMapParser<'a, R, T, U>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     pub fn new(
-        parser: &'a mut dyn Parser<'a, R, T>,
+        parser: &'a mut dyn Parser<R, T>,
         transform: &'a dyn Fn(T) -> PossumNodeKind<U>,
     ) -> FlatMapParser<'a, R, T, U> {
         FlatMapParser { parser, transform }
     }
 }
 
-impl<'a, R, T, U> Parser<'a, R, U> for FlatMapParser<'a, R, T, U>
+impl<'a, R, T, U> Parser<R, U> for FlatMapParser<'a, R, T, U>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<U>
     where
@@ -252,29 +275,29 @@ where
 
 pub struct OrParser<'a, R, T>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
-    lhs: &'a mut dyn Parser<'a, R, T>,
-    rhs: &'a mut dyn Parser<'a, R, T>,
+    lhs: &'a mut dyn Parser<R, T>,
+    rhs: &'a mut dyn Parser<R, T>,
     default: &'a dyn Fn(&YamlNode<R>) -> PossumNodeKind<T>,
 }
 
 impl<'a, R, T> OrParser<'a, R, T>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     pub fn new(
-        lhs: &'a mut dyn Parser<'a, R, T>,
-        rhs: &'a mut dyn Parser<'a, R, T>,
+        lhs: &'a mut dyn Parser<R, T>,
+        rhs: &'a mut dyn Parser<R, T>,
         default: &'a dyn Fn(&YamlNode<R>) -> PossumNodeKind<T>,
     ) -> OrParser<'a, R, T> {
         OrParser { lhs, rhs, default }
     }
 }
 
-impl<'a, R, T> Parser<'a, R, T> for OrParser<'a, R, T>
+impl<'a, R, T> Parser<R, T> for OrParser<'a, R, T>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<T>
     where

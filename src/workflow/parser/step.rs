@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
 
@@ -92,17 +90,13 @@ impl Into<job::Step> for StepBuilder {
     }
 }
 
-pub struct StepParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    _x: PhantomData<R>,
+pub struct StepParser<'a> {
     annotations: &'a mut Annotations,
 }
 
-impl<'a, R> Parser<'a, R, job::Step> for StepParser<'a, R>
+impl<'a, R> Parser<R, job::Step> for StepParser<'a>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<job::Step>
     where
@@ -127,15 +121,9 @@ where
     }
 }
 
-impl<'a, R> StepParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    pub fn new(a: &'a mut Annotations) -> StepParser<'a, R> {
-        StepParser {
-            _x: PhantomData,
-            annotations: a,
-        }
+impl<'a> StepParser<'a> {
+    pub fn new(a: &'a mut Annotations) -> StepParser<'a> {
+        StepParser { annotations: a }
     }
     fn annotate<A>(&mut self, a: A)
     where

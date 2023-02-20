@@ -13,9 +13,9 @@ pub struct InputParser<R>(PhantomData<R>)
 where
     R: Repr;
 
-impl<'a, R> Parser<'a, R, on::WorkflowInput> for InputParser<R>
+impl<R> Parser<R, on::WorkflowInput> for InputParser<R>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &yaml_peg::Node<R>) -> PossumNodeKind<on::WorkflowInput>
     where

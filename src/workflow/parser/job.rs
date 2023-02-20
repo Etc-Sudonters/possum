@@ -7,22 +7,17 @@ use crate::scavenge::yaml::YamlKind;
 use crate::scavenge::{Parser, UnexpectedKey};
 use crate::workflow::job::{self, Job};
 use crate::workflow::parser::step::StepParser;
-use std::marker::PhantomData;
 use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
 use yaml_peg::{Map as YamlMap, Yaml};
 
-pub struct JobParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    _x: PhantomData<R>,
+pub struct JobParser<'a> {
     annotations: &'a mut Annotations,
 }
 
-impl<'a, R> Parser<'a, R, Job> for JobParser<'a, R>
+impl<'a, R> Parser<R, Job> for JobParser<'a>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &yaml_peg::Node<R>) -> PossumNodeKind<Job>
     where
@@ -35,15 +30,9 @@ where
     }
 }
 
-impl<'a, R> JobParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    pub fn new(a: &'a mut Annotations) -> JobParser<'a, R> {
-        JobParser {
-            _x: PhantomData,
-            annotations: a,
-        }
+impl<'a> JobParser<'a> {
+    pub fn new(a: &'a mut Annotations) -> JobParser<'a> {
+        JobParser { annotations: a }
     }
 
     fn annotate<A>(&mut self, annotation: A)
@@ -53,7 +42,10 @@ where
         self.annotations.add(annotation)
     }
 
-    fn parse(&mut self, root: &YamlMap<R>) -> Job {
+    fn parse<R>(&mut self, root: &YamlMap<R>) -> Job
+    where
+        R: Repr,
+    {
         let mut job = Job::default();
 
         for (key, value) in root.iter() {
@@ -66,9 +58,10 @@ where
         job
     }
 
-    fn job_key<P>(&mut self, job: &mut Job, key: &str, value: &YamlNode<R>, p: &P)
+    fn job_key<P, R>(&mut self, job: &mut Job, key: &str, value: &YamlNode<R>, p: &P)
     where
         P: AsDocumentPointer,
+        R: Repr,
     {
         use PossumNodeKind::*;
         match key.to_lowercase().as_str() {

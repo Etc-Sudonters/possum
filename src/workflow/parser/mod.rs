@@ -8,27 +8,21 @@ mod step;
 use yaml_peg::repr::Repr;
 use yaml_peg::{Map, Node as YamlNode};
 
-use super::job::Job;
 use super::Workflow;
-use crate::document::{Annotation, Annotations};
-use crate::scavenge::ast::{PossumMap, PossumNode, PossumNodeKind};
+use crate::document::Annotations;
+use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::Extract;
-use crate::scavenge::parser::Parser;
-use crate::scavenge::UnexpectedKey;
-use std::marker::PhantomData;
+use crate::scavenge::parser::{Parser, StringParser};
+use crate::scavenge::{MapParser, UnexpectedKey};
 use std::string::ToString;
 
-pub struct WorkflowParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    _x: PhantomData<R>,
+pub struct WorkflowParser<'a> {
     annotations: &'a mut Annotations,
 }
 
-impl<'a, R> Parser<'a, R, Workflow> for WorkflowParser<'a, R>
+impl<'a, R> Parser<R, Workflow> for WorkflowParser<'a>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<Workflow> {
         match root.extract_map() {
@@ -38,50 +32,53 @@ where
     }
 }
 
-impl<'a, R> WorkflowParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    pub fn new(a: &'a mut Annotations) -> WorkflowParser<'a, R> {
-        WorkflowParser {
-            annotations: a,
-            _x: PhantomData,
-        }
+impl<'a> WorkflowParser<'a> {
+    pub fn new(a: &'a mut Annotations) -> WorkflowParser<'a> {
+        WorkflowParser { annotations: a }
     }
 
-    fn parse_map(&mut self, m: &Map<R>) -> Workflow {
+    fn parse_map<R>(&mut self, m: &Map<R>) -> Workflow
+    where
+        R: Repr,
+    {
         let mut wf = Workflow::default();
         for (key, value) in m.into_iter() {
             match key.extract_str() {
                 Ok(s) => self.visit_root_key(s.to_lowercase(), key, value, &mut wf),
-                Err(err) => self.annotate(err.at(key)),
+                Err(err) => self.annotations.add(err.at(key)),
             }
         }
 
         wf
     }
 
-    fn visit_root_key(
+    fn visit_root_key<R>(
         &mut self,
         raw_key: String,
         key: &YamlNode<R>,
         value: &YamlNode<R>,
         workflow: &mut Workflow,
-    ) {
+    ) where
+        R: Repr,
+    {
         // we can't currently detect repeated keys ):
         match raw_key.as_str() {
             "name" => {
-                workflow.name = Some(self.name(value));
+                workflow.name = Some(StringParser.parse_node(value).at(value));
             }
             "run_name" => {
-                workflow.run_name = Some(self.run_name(value));
+                workflow.run_name = Some(StringParser.parse_node(value).at(value));
             }
             "on" => {
                 let on = on::OnParser::new(self.annotations).parse_node(value);
                 workflow.on = Some(on.at(value));
             }
             "jobs" => {
-                workflow.jobs = Some(self.jobs(value));
+                workflow.jobs = Some(
+                    MapParser::new(&mut job::JobParser::new(self.annotations))
+                        .parse_node(value)
+                        .at(value),
+                );
             }
             "permissions" => {
                 workflow.permissions = Some(
@@ -97,56 +94,9 @@ where
                         .at(value),
                 );
             }
-            s => self.annotate(UnexpectedKey::at(&s.to_owned(), value)),
+            s => self
+                .annotations
+                .add(UnexpectedKey::at(&s.to_owned(), value)),
         }
-    }
-
-    fn annotate<A>(&mut self, a: A)
-    where
-        A: Into<Annotation>,
-    {
-        self.annotations.add(a.into())
-    }
-
-    fn name(&mut self, n: &YamlNode<R>) -> PossumNode<String> {
-        match n.extract_str() {
-            Ok(s) => PossumNodeKind::Value(s.to_owned()),
-            Err(e) => PossumNodeKind::Invalid(e.to_string()),
-        }
-        .at(n)
-    }
-
-    fn run_name(&mut self, n: &YamlNode<R>) -> PossumNode<String> {
-        match n.extract_str() {
-            Ok(s) => PossumNodeKind::Expr(s.to_owned()),
-            Err(e) => PossumNodeKind::Invalid(e.to_string()),
-        }
-        .at(n)
-    }
-
-    fn jobs(&mut self, n: &YamlNode<R>) -> PossumNode<PossumMap<String, Job>> {
-        use PossumNodeKind::*;
-        match n.extract_map() {
-            Ok(root) => {
-                let mut jobs = PossumMap::empty();
-                for (name, job) in root.iter() {
-                    let k = match name.extract_str() {
-                        Ok(s) => Value(s.to_owned()),
-                        Err(u) => Invalid(u.to_string()),
-                    }
-                    .at(name);
-
-                    let job = job::JobParser::new(self.annotations)
-                        .parse_node(job)
-                        .at(job);
-
-                    jobs.insert(k, job);
-                }
-
-                Value(jobs)
-            }
-            Err(u) => PossumNodeKind::Invalid(u.to_string()),
-        }
-        .at(n)
     }
 }

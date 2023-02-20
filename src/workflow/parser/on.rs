@@ -2,9 +2,9 @@ use super::event::EventParser;
 use crate::document::Annotations;
 use crate::scavenge::ast::{PossumNodeKind, PossumSeq};
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
-use crate::scavenge::parser::{Parser, FlatMapParser, StringParser};
+use crate::scavenge::parser::{FlatMapParser, Parser, SeqParser, StrParser, TransformParser};
 use crate::scavenge::yaml::YamlKind;
-use crate::workflow::on::{self, EventKind};
+use crate::workflow::on::{self, BadEvent, EventKind};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use yaml_peg::repr::Repr;
@@ -18,23 +18,56 @@ where
     annotations: &'a mut Annotations,
 }
 
+struct EventKindParser;
 struct OnStringParser;
 struct OnArrayParser;
 struct OnMapParser;
 
-impl<'a, R> Parser<'a, R, on::Trigger> for OnStringParser
+impl<R> Parser<R, on::EventKind> for EventKindParser
 where
-    R: Repr + 'a,
+    R: Repr,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::EventKind>
+    where
+        R: Repr,
+    {
+        FlatMapParser::new(&mut StrParser::new(), &|s| match EventKind::fromstr(s) {
+            Ok(ek) => PossumNodeKind::Value(ek),
+            Err(_) => PossumNodeKind::Invalid(BadEvent::Unknown(s.to_owned()).to_string()),
+        })
+        .parse_node(root)
+    }
+}
+
+impl<R> Parser<R, on::Trigger> for OnStringParser
+where
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::Trigger>
     where
         R: Repr,
     {
-        FlatMapParser(&StringParser, 
+        PossumNodeKind::Value(EventKindParser.parse_node(root).at(root).into())
     }
 }
 
-impl<'a, R> Parser<'a, R, on::Trigger> for OnParser<'a, R>
+impl<R> Parser<R, on::Trigger> for OnArrayParser
+where
+    R: Repr,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::Trigger>
+    where
+        R: Repr,
+    {
+        TransformParser::new(
+            &mut SeqParser::new(&mut EventKindParser),
+            &Into::<on::Trigger>::into,
+        )
+        .parse_node(root)
+    }
+}
+
+impl<'a, R> Parser<R, on::Trigger> for OnParser<'a, R>
 where
     R: Repr + 'a,
 {

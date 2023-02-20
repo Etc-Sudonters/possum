@@ -10,21 +10,16 @@ use crate::scavenge::parser::TransformParser;
 use crate::scavenge::MapParser;
 use crate::scavenge::{Parser, UnexpectedKey};
 use crate::workflow::on::{self, Globbed};
-use std::marker::PhantomData;
 use yaml_peg::repr::Repr;
 use yaml_peg::{Map as YamlMap, Node as YamlNode};
 
-pub struct EventParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    _x: PhantomData<&'a R>,
+pub struct EventParser<'a> {
     annotations: &'a mut Annotations,
 }
 
-impl<'a, R> Parser<'a, R, on::Event> for EventParser<'a, R>
+impl<'a, R> Parser<R, on::Event> for EventParser<'a>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::Event>
     where
@@ -37,15 +32,9 @@ where
     }
 }
 
-impl<'a, R> EventParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    pub fn new(a: &'a mut Annotations) -> EventParser<'a, R> {
-        EventParser {
-            _x: PhantomData,
-            annotations: a,
-        }
+impl<'a> EventParser<'a> {
+    pub fn new(a: &'a mut Annotations) -> EventParser<'a> {
+        EventParser { annotations: a }
     }
 
     fn annotate<A>(&mut self, annotation: A)
@@ -55,7 +44,10 @@ where
         self.annotations.add(annotation);
     }
 
-    fn parse_map(&mut self, root: &YamlMap<R>) -> on::Event {
+    fn parse_map<R>(&mut self, root: &YamlMap<R>) -> on::Event
+    where
+        R: Repr,
+    {
         let mut evt = on::Event::new();
         for (key, value) in root.iter() {
             match key.extract_str() {
@@ -67,9 +59,15 @@ where
         evt
     }
 
-    fn visit_event_key<P>(&mut self, event: &mut on::Event, key: String, value: &YamlNode<R>, p: &P)
-    where
+    fn visit_event_key<P, R>(
+        &mut self,
+        event: &mut on::Event,
+        key: String,
+        value: &YamlNode<R>,
+        p: &P,
+    ) where
         P: AsDocumentPointer,
+        R: Repr,
     {
         match key.to_lowercase().as_str() {
             "branches" => {
@@ -144,9 +142,9 @@ where
 struct InheritedSecretParser;
 struct WorkflowOutputParser;
 
-impl<'a, R> Parser<'a, R, on::InheritedSecret> for InheritedSecretParser
+impl<R> Parser<R, on::InheritedSecret> for InheritedSecretParser
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::InheritedSecret>
     where
@@ -161,9 +159,9 @@ where
     }
 }
 
-impl<'a, R> Parser<'a, R, on::WorkflowOutput> for WorkflowOutputParser
+impl<R> Parser<R, on::WorkflowOutput> for WorkflowOutputParser
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::WorkflowOutput>
     where

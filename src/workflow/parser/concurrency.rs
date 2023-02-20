@@ -15,9 +15,9 @@ impl<'a> ConcurrencyParser<'a> {
     }
 }
 
-impl<'a, R> Parser<'a, R, Concurrency> for ConcurrencyParser<'a>
+impl<'a, R> Parser<R, Concurrency> for ConcurrencyParser<'a>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
     fn parse_node(&mut self, root: &yaml_peg::Node<R>) -> PossumNodeKind<Concurrency>
     where
@@ -50,7 +50,7 @@ impl<'a> ConcurrencyMapParser<'a> {
     }
 }
 
-impl<'a, R> Parser<'a, R, Concurrency> for ConcurrencyStringParser
+impl<'a, R> Parser<R, Concurrency> for ConcurrencyStringParser
 where
     R: Repr + 'a,
 {
@@ -62,7 +62,7 @@ where
     }
 }
 
-impl<'a, R> Parser<'a, R, Concurrency> for ConcurrencyMapParser<'a>
+impl<'a, R> Parser<R, Concurrency> for ConcurrencyMapParser<'a>
 where
     R: Repr + 'a,
 {
