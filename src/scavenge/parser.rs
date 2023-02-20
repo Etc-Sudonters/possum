@@ -106,27 +106,33 @@ where
     }
 }
 
-pub struct MapParser<'a, R, T>
+pub type InnerParser<'a, R, T> = &'a mut dyn Parser<R, T>;
+
+pub struct MapParser<'a, R, K, V>
 where
     R: Repr,
 {
-    parser: &'a mut dyn Parser<R, T>,
+    keys: InnerParser<'a, R, K>,
+    values: InnerParser<'a, R, V>,
 }
 
-impl<'a, R, T> MapParser<'a, R, T>
+impl<'a, R, K, V> MapParser<'a, R, K, V>
 where
     R: Repr,
 {
-    pub fn new(parser: &'a mut dyn Parser<R, T>) -> MapParser<R, T> {
-        MapParser { parser }
+    pub fn new(
+        keys: InnerParser<'a, R, K>,
+        values: InnerParser<'a, R, V>,
+    ) -> MapParser<'a, R, K, V> {
+        MapParser { keys, values }
     }
 }
 
-impl<'a, R, T> Parser<R, PossumMap<String, T>> for MapParser<'a, R, T>
+impl<'a, R, K, V> Parser<R, PossumMap<K, V>> for MapParser<'a, R, K, V>
 where
     R: Repr,
 {
-    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<PossumMap<String, T>>
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<PossumMap<K, V>>
     where
         R: Repr,
     {
@@ -137,8 +143,8 @@ where
                 let mut map = PossumMap::empty();
 
                 for (key, value) in m.iter() {
-                    let k: PossumNodeKind<String> = key.extract_str().map(ToOwned::to_owned).into();
-                    let v: PossumNodeKind<T> = self.parser.parse_node(value);
+                    let k: PossumNodeKind<K> = self.keys.parse_node(key);
+                    let v: PossumNodeKind<V> = self.values.parse_node(value);
 
                     map.insert(k.at(key), v.at(value));
                 }
@@ -146,6 +152,26 @@ where
                 Value(map)
             }
         }
+    }
+}
+
+pub struct StringMapParser(StringParser, StringParser);
+
+impl StringMapParser {
+    pub fn new() -> StringMapParser {
+        StringMapParser(StringParser, StringParser)
+    }
+}
+
+impl<R> Parser<R, PossumMap<String, String>> for StringMapParser
+where
+    R: Repr,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<PossumMap<String, String>>
+    where
+        R: Repr,
+    {
+        MapParser::new(&mut self.0, &mut self.1).parse_node(root)
     }
 }
 
@@ -186,7 +212,7 @@ pub struct TransformParser<'a, R, T, U>
 where
     R: Repr,
 {
-    parser: &'a mut dyn Parser<R, T>,
+    parser: InnerParser<'a, R, T>,
     transform: &'a dyn Fn(T) -> U,
 }
 
@@ -195,7 +221,7 @@ where
     R: Repr,
 {
     pub fn new(
-        parser: &'a mut dyn Parser<R, T>,
+        parser: InnerParser<'a, R, T>,
         transform: &'a dyn Fn(T) -> U,
     ) -> TransformParser<'a, R, T, U> {
         TransformParser { parser, transform }
@@ -218,7 +244,7 @@ pub struct FlatMapParser<'a, R, T, U>
 where
     R: Repr,
 {
-    parser: &'a mut dyn Parser<R, T>,
+    parser: InnerParser<'a, R, T>,
     transform: &'a dyn Fn(T) -> PossumNodeKind<U>,
 }
 
@@ -227,7 +253,7 @@ where
     R: Repr,
 {
     pub fn new(
-        parser: &'a mut dyn Parser<R, T>,
+        parser: InnerParser<'a, R, T>,
         transform: &'a dyn Fn(T) -> PossumNodeKind<U>,
     ) -> FlatMapParser<'a, R, T, U> {
         FlatMapParser { parser, transform }
@@ -250,8 +276,8 @@ pub struct OrParser<'a, R, T>
 where
     R: Repr,
 {
-    lhs: &'a mut dyn Parser<R, T>,
-    rhs: &'a mut dyn Parser<R, T>,
+    lhs: InnerParser<'a, R, T>,
+    rhs: InnerParser<'a, R, T>,
     default: &'a dyn Fn(&YamlNode<R>) -> PossumNodeKind<T>,
 }
 
@@ -260,8 +286,8 @@ where
     R: Repr,
 {
     pub fn new(
-        lhs: &'a mut dyn Parser<R, T>,
-        rhs: &'a mut dyn Parser<R, T>,
+        lhs: InnerParser<'a, R, T>,
+        rhs: InnerParser<'a, R, T>,
         default: &'a dyn Fn(&YamlNode<R>) -> PossumNodeKind<T>,
     ) -> OrParser<'a, R, T> {
         OrParser { lhs, rhs, default }
@@ -283,10 +309,10 @@ where
     }
 }
 
-pub struct Pluralize<'a, R, T>(&'a mut dyn Parser<R, T>);
+pub struct Pluralize<'a, R, T>(InnerParser<'a, R, T>);
 
 impl<'a, R, T> Pluralize<'a, R, T> {
-    pub fn new(inner: &'a mut dyn Parser<R, T>) -> Pluralize<'a, R, T> {
+    pub fn new(inner: InnerParser<'a, R, T>) -> Pluralize<'a, R, T> {
         Pluralize(inner)
     }
 }

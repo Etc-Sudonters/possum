@@ -54,7 +54,7 @@ impl Builder<Workflow> for WorkflowBuilder {
             }
             "jobs" => {
                 item.jobs = Some(
-                    MapParser::new(&mut job::JobParser::new(annotations))
+                    MapParser::new(&mut StringParser, &mut job::JobParser::new(annotations))
                         .parse_node(value)
                         .at(value),
                 );

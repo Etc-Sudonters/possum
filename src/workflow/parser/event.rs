@@ -1,9 +1,10 @@
 use super::input::InputParser;
-use crate::document::Annotation;
 use crate::document::Annotations;
 use crate::document::AsDocumentPointer;
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::Extract;
+use crate::scavenge::parser::Builder;
+use crate::scavenge::parser::ObjectParser;
 use crate::scavenge::parser::SeqParser;
 use crate::scavenge::parser::StringParser;
 use crate::scavenge::parser::TransformParser;
@@ -11,11 +12,17 @@ use crate::scavenge::MapParser;
 use crate::scavenge::{Parser, UnexpectedKey};
 use crate::workflow::on::{self, Globbed};
 use yaml_peg::repr::Repr;
-use yaml_peg::{Map as YamlMap, Node as YamlNode};
+use yaml_peg::Node as YamlNode;
 
-pub struct EventParser<'a> {
-    annotations: &'a mut Annotations,
+pub struct EventParser<'a>(&'a mut Annotations);
+
+impl<'a> EventParser<'a> {
+    pub fn new(annotations: &'a mut Annotations) -> EventParser<'a> {
+        EventParser(annotations)
+    }
 }
+
+struct EventBuilder;
 
 impl<'a, R> Parser<R, on::Event> for EventParser<'a>
 where
@@ -25,51 +32,23 @@ where
     where
         R: Repr,
     {
-        match root.extract_map() {
-            Ok(m) => PossumNodeKind::Value(self.parse_map(m)),
-            Err(u) => PossumNodeKind::Invalid(u.to_string()),
-        }
+        ObjectParser::new(EventBuilder, on::Event::default, &mut self.0).parse_node(root)
     }
 }
 
-impl<'a> EventParser<'a> {
-    pub fn new(a: &'a mut Annotations) -> EventParser<'a> {
-        EventParser { annotations: a }
-    }
-
-    fn annotate<A>(&mut self, annotation: A)
-    where
-        A: Into<Annotation>,
-    {
-        self.annotations.add(annotation);
-    }
-
-    fn parse_map<R>(&mut self, root: &YamlMap<R>) -> on::Event
-    where
-        R: Repr,
-    {
-        let mut evt = on::Event::new();
-        for (key, value) in root.iter() {
-            match key.extract_str() {
-                Ok(s) => self.visit_event_key(&mut evt, s.to_lowercase(), value, key),
-                Err(err) => self.annotate(Annotation::error(key, &err)),
-            }
-        }
-
-        evt
-    }
-
-    fn visit_event_key<P, R>(
+impl Builder<on::Event> for EventBuilder {
+    fn build<'a, P, R>(
         &mut self,
         event: &mut on::Event,
-        key: String,
+        key: &str,
         value: &YamlNode<R>,
-        p: &P,
+        pointer: &P,
+        annotations: &'a mut Annotations,
     ) where
         P: AsDocumentPointer,
         R: Repr,
     {
-        match key.to_lowercase().as_str() {
+        match key {
             "branches" => {
                 event.branches = Some(
                     SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
@@ -115,26 +94,26 @@ impl<'a> EventParser<'a> {
             }
             "inputs" => {
                 event.inputs = Some(
-                    MapParser::new(&mut InputParser::new())
+                    MapParser::new(&mut StringParser, &mut InputParser::new())
                         .parse_node(value)
                         .at(value),
                 );
             }
             "outputs" => {
                 event.outputs = Some(
-                    MapParser::new(&mut WorkflowOutputParser)
+                    MapParser::new(&mut StringParser, &mut WorkflowOutputParser)
                         .parse_node(value)
                         .at(value),
                 );
             }
             "secrets" => {
                 event.secrets = Some(
-                    MapParser::new(&mut InheritedSecretParser)
+                    MapParser::new(&mut StringParser, &mut InheritedSecretParser)
                         .parse_node(value)
                         .at(value),
                 );
             }
-            s => self.annotate(UnexpectedKey::from(s).at(value)),
+            s => annotations.add(UnexpectedKey::from(s).at(value)),
         }
     }
 }

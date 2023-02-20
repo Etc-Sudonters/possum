@@ -4,10 +4,11 @@ use crate::document::{Annotations, AsDocumentPointer};
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
 use crate::scavenge::parser::{
-    Builder, ObjectParser, OrParser, Pluralize, SeqParser, StringParser, TransformParser,
+    Builder, ObjectParser, OrParser, Pluralize, SeqParser, StringMapParser, StringParser,
+    TransformParser,
 };
 use crate::scavenge::yaml::YamlKind;
-use crate::scavenge::{MapParser, Parser, UnexpectedKey};
+use crate::scavenge::{Parser, UnexpectedKey};
 use crate::workflow::job::{self, Job};
 use crate::workflow::parser::step::StepParser;
 use yaml_peg::repr::Repr;
@@ -117,18 +118,10 @@ impl Builder<job::Job> for JobBuilder {
                 );
             }
             "env" => {
-                item.env = Some({
-                    MapParser::new(&mut StringParser)
-                        .parse_node(value)
-                        .at(value)
-                });
+                item.env = Some(StringMapParser::new().parse_node(value).at(value));
             }
             "with" => {
-                item.with = Some(
-                    MapParser::new(&mut StringParser)
-                        .parse_node(value)
-                        .at(value),
-                );
+                item.with = Some(StringMapParser::new().parse_node(value).at(value));
             }
             "concurrency" => {
                 item.concurrency = Some(
@@ -202,11 +195,7 @@ impl Builder<job::Job> for JobBuilder {
                 );
             }
             "outputs" => {
-                item.outputs = Some(
-                    MapParser::new(&mut StringParser)
-                        .parse_node(value)
-                        .at(value),
-                );
+                item.outputs = Some(StringMapParser::new().parse_node(value).at(value));
             }
             "timeout-minutes" => {
                 let timeout: PossumNodeKind<f64> = value.extract_number().into();

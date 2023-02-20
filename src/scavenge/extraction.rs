@@ -78,7 +78,7 @@ impl IntoYamlKind for YamlKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExpectedYaml {
     Only(YamlKind),
     AnyOf(Vec<YamlKind>),

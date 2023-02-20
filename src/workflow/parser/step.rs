@@ -6,7 +6,7 @@ use crate::{
     scavenge::{
         ast::PossumNodeKind,
         extraction::Extract,
-        parser::{MapParser, Parser, StringParser},
+        parser::{Parser, StringMapParser, StringParser},
         Fallible, UnexpectedKey,
     },
     workflow::job,
@@ -60,20 +60,12 @@ impl StepBuilder {
                 }
 
                 "with" => {
-                    self.step.with = Some(
-                        MapParser::new(&mut StringParser)
-                            .parse_node(value)
-                            .at(value),
-                    );
+                    self.step.with = Some(StringMapParser::new().parse_node(value).at(value));
                     Fallible::Success
                 }
 
                 "env" => {
-                    self.step.env = Some(
-                        MapParser::new(&mut StringParser)
-                            .parse_node(value)
-                            .at(value),
-                    );
+                    self.step.env = Some(StringMapParser::new().parse_node(value).at(value));
 
                     Fallible::Success
                 }
