@@ -43,7 +43,7 @@ pub enum DocumentError {
 }
 
 pub struct Document {
-    raw: Vec<u8>,
+    _raw: Vec<u8>,
     len: usize,
     lines: Vec<usize>,
 }
@@ -59,10 +59,10 @@ impl Document {
     where
         D: Into<Vec<u8>>,
     {
-        let raw = raw.into();
-        let len = raw.len();
-        let lines = raw.split(|c| *c == b'\n').map(|l| l.len() + 1).collect();
-        Document { raw, len, lines }
+        let _raw = raw.into();
+        let len = _raw.len();
+        let lines = _raw.split(|c| *c == b'\n').map(|l| l.len() + 1).collect();
+        Document { _raw, len, lines }
     }
 
     pub fn pos<P>(&self, p: P) -> Result<DocumentPosition, DocumentError>

@@ -102,7 +102,7 @@ impl Builder<job::Job> for JobBuilder {
         item: &mut job::Job,
         key: &str,
         value: &YamlNode<R>,
-        pointer: &P,
+        _: &P,
         annotations: &'a mut Annotations,
     ) where
         P: AsDocumentPointer,

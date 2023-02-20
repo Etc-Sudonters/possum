@@ -4,7 +4,6 @@
  * possum lint/hiss <directory | .>
  * possum search/rummage <directory | .>
  */
-#![allow(dead_code, unused_variables)]
 mod cli;
 mod document;
 mod lint;

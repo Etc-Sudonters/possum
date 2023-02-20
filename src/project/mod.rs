@@ -12,31 +12,19 @@ pub enum InitFailures {
 
 #[derive(Debug)]
 pub struct Project {
-    root: PathBuf,
+    _root: PathBuf,
     // this is set if we needed to rut around to find the workflows directory
     orig_root: Option<PathBuf>,
     entries: Vec<ProjectEntry>,
 }
 
 impl Project {
-    pub fn from<P, E>(root: P, entries: E) -> Self
-    where
-        P: Into<PathBuf>,
-        E: Into<Vec<ProjectEntry>>,
-    {
-        Project {
-            root: root.into(),
-            entries: entries.into(),
-            orig_root: None,
-        }
-    }
-
     pub fn new<P>(root: P) -> Self
     where
         P: Into<PathBuf>,
     {
         Project {
-            root: root.into(),
+            _root: root.into(),
             entries: Vec::with_capacity(8),
             orig_root: None,
         }
@@ -48,10 +36,6 @@ impl Project {
 
     pub fn entries<'a>(&'a self) -> std::slice::Iter<ProjectEntry> {
         self.entries.iter()
-    }
-
-    pub fn root(&self) -> PathBuf {
-        self.root.clone()
     }
 }
 

@@ -35,7 +35,7 @@ impl Builder<Workflow> for WorkflowBuilder {
         item: &mut Workflow,
         key: &str,
         value: &YamlNode<R>,
-        pointer: &P,
+        _: &P,
         annotations: &'a mut Annotations,
     ) where
         P: crate::document::AsDocumentPointer,

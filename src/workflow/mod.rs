@@ -31,7 +31,6 @@ pub enum Concurrency {
 #[derive(Debug)]
 pub enum Permission {
     GlobalGrant(Grant),
-    GlobalRevoke,
     IndividualGrants(PossumMap<String, Grant>),
 }
 

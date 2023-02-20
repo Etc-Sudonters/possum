@@ -37,6 +37,11 @@ pub fn build(mut root: PathBuf) -> Result<Project, InitFailures> {
     }
 
     let workflows = get_all_workflows(&root);
+
+    if workflows.is_empty() {
+        Err(InitFailures::NoWorkflows(root.clone()))?;
+    }
+
     let mut project = Project::new(root);
     project.orig_root = orig_root;
 
@@ -56,11 +61,11 @@ pub fn build(mut root: PathBuf) -> Result<Project, InitFailures> {
                         });
                     }
                     Err(pf) => {
-                        project.push(ProjectEntry::ParseFailure(p, ParseFailure::CouldntOpen));
+                        project.push(ProjectEntry::ParseFailure(p, pf));
                     }
                 }
             }
-            Err(e) => {
+            Err(_) => {
                 project.push(ProjectEntry::ParseFailure(p, ParseFailure::CouldntOpen));
             }
         }

@@ -29,7 +29,6 @@ impl Default for Trigger {
 impl Into<Trigger> for PossumNode<EventKind> {
     fn into(self) -> Trigger {
         let mut trig = Trigger::empty();
-        let loc = self.loc();
         trig.add_event_name(self);
         trig
     }

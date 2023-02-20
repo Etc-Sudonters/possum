@@ -16,7 +16,7 @@ impl Display for OneLineRender {
                     source,
                     document,
                     annotations,
-                    workflow,
+                    ..
                 } => {
                     for a in annotations.entries() {
                         writeln!(

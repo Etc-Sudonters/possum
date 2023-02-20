@@ -30,7 +30,7 @@ fn parse_individual_grant(grant: &str) -> PossumNodeKind<Grant> {
         "read" => Value(Grant::Read),
         "write" => Value(Grant::Write),
         "none" => Value(Grant::Deny),
-        u @ _ => Invalid("Expected read, write or none but found {u}".to_owned()),
+        u @ _ => Invalid(format!("Expected read, write or none but found {u}")),
     }
 }
 
@@ -47,7 +47,7 @@ where
             Yaml::Str(all) => match all.to_lowercase().as_str() {
                 "read-all" => Value(Permission::GlobalGrant(Grant::Read)),
                 "write-all" => Value(Permission::GlobalGrant(Grant::Write)),
-                g @ _ => Invalid("Expected read-all or write-all, but found {g}".to_owned()),
+                g @ _ => Invalid(format!("Expected read-all or write-all, but found {g}")),
             },
             Yaml::Map(each) => {
                 let mut perms = PossumMap::empty();

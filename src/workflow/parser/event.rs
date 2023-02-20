@@ -45,7 +45,7 @@ impl Builder<on::Event> for EventBuilder {
         item: &mut on::Event,
         key: &str,
         value: &YamlNode<R>,
-        pointer: &P,
+        _: &P,
         annotations: &'a mut Annotations,
     ) where
         P: AsDocumentPointer,
