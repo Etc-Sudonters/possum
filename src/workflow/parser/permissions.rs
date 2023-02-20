@@ -77,7 +77,6 @@ where
 
                 Value(Permission::IndividualGrants(perms))
             }
-            Yaml::Null => todo!(),
             u @ _ => Invalid(
                 ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Map])
                     .but_found(u)

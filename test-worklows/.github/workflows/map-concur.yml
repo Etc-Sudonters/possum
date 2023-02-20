@@ -1,0 +1,3 @@
+concurrency:
+  group: poop
+  cancel-in-progress: false

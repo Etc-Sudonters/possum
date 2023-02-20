@@ -1,22 +1,19 @@
-use crate::document::AsDocumentPointer;
-use crate::scavenge::ast::{PossumNodeKind, PossumSeq};
+use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
+use crate::scavenge::parser::{BoolParser, SeqParser, StringParser};
 use crate::scavenge::yaml::YamlKind;
 use crate::scavenge::Parser;
 use crate::workflow::on;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use yaml_peg::repr::Repr;
-use yaml_peg::{Node as YamlNode, Seq as YamlSeq, Yaml};
+use yaml_peg::{Node as YamlNode, Yaml};
 
-pub struct InputParser<'a, R>
+pub struct InputParser<R>(PhantomData<R>)
 where
-    R: Repr + 'a,
-{
-    _x: PhantomData<&'a R>,
-}
+    R: Repr;
 
-impl<'a, R> Parser<'a, R, on::WorkflowInput> for InputParser<'a, R>
+impl<'a, R> Parser<'a, R, on::WorkflowInput> for InputParser<R>
 where
     R: Repr + 'a,
 {
@@ -31,26 +28,13 @@ where
             match key.extract_str() {
                 Ok(s) => match s.to_lowercase().as_str() {
                     "description" => {
-                        input.description = Some(
-                            value
-                                .extract_str()
-                                .map_or_else(
-                                    |unexpected| Invalid(unexpected.to_string()),
-                                    |description| Value(description.to_owned()),
-                                )
-                                .at(value),
-                        );
+                        input.description = Some(StringParser.parse_node(value).at(value));
                     }
                     "default" => {
                         input.default = Some(Self::default_value(value).at(value));
                     }
                     "required" => {
-                        input.required = Some(
-                            value
-                                .extract_bool()
-                                .map_or_else(|unexpected| Invalid(unexpected.to_string()), Value)
-                                .at(value),
-                        );
+                        input.required = Some(BoolParser.parse_node(value).at(value));
                     }
                     "type" => {
                         input.input_type = Some(
@@ -72,12 +56,8 @@ where
                     }
                     "choices" => {
                         input.choices = Some(
-                            value
-                                .extract_seq()
-                                .map_or_else(
-                                    |unexpected| Invalid(unexpected.to_string()),
-                                    |choices| Value(Self::choices(choices)),
-                                )
+                            SeqParser::new(&mut StringParser)
+                                .parse_node(value)
                                 .at(value),
                         );
                     }
@@ -91,25 +71,12 @@ where
     }
 }
 
-impl<'a, R> InputParser<'a, R>
+impl<R> InputParser<R>
 where
-    R: Repr + 'a,
+    R: Repr,
 {
-    pub fn new() -> InputParser<'a, R> {
-        InputParser { _x: PhantomData }
-    }
-
-    fn choices(root: &YamlSeq<R>) -> PossumSeq<String> {
-        root.into_iter()
-            .map(|n| (n.extract_str(), n.as_document_pointer()))
-            .map(|(node, pos)| {
-                node.map_or_else(
-                    |unexpected| PossumNodeKind::Invalid(unexpected.to_string()),
-                    |choice| PossumNodeKind::Value(choice.to_string()),
-                )
-                .at(pos)
-            })
-            .collect()
+    pub fn new() -> InputParser<R> {
+        InputParser(PhantomData)
     }
 
     fn default_value(root: &YamlNode<R>) -> PossumNodeKind<on::WorkflowInputDefault> {

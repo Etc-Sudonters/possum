@@ -1,40 +1,21 @@
 use crate::document::{Annotation, Annotations};
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
+use crate::scavenge::parser::{OrParser, StringParser, TransformParser};
 use crate::scavenge::yaml::YamlKind;
 use crate::scavenge::{Parser, UnexpectedKey};
 use crate::workflow::Concurrency;
-use std::marker::PhantomData;
 use yaml_peg::repr::Repr;
-use yaml_peg::Yaml;
 
-pub struct ConcurrencyParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    _x: PhantomData<R>,
-    annotations: &'a mut Annotations,
-}
-impl<'a, R> ConcurrencyParser<'a, R>
-where
-    R: Repr + 'a,
-{
-    pub fn new(a: &'a mut Annotations) -> ConcurrencyParser<'a, R> {
-        ConcurrencyParser {
-            _x: PhantomData,
-            annotations: a,
-        }
-    }
+pub struct ConcurrencyParser<'a>(&'a mut Annotations);
 
-    fn annotate<A>(&mut self, a: A)
-    where
-        A: Into<Annotation>,
-    {
-        self.annotations.add(a)
+impl<'a> ConcurrencyParser<'a> {
+    pub fn new(annotations: &'a mut Annotations) -> ConcurrencyParser<'a> {
+        ConcurrencyParser(annotations)
     }
 }
 
-impl<'a, R> Parser<'a, R, Concurrency> for ConcurrencyParser<'a, R>
+impl<'a, R> Parser<'a, R, Concurrency> for ConcurrencyParser<'a>
 where
     R: Repr + 'a,
 {
@@ -42,10 +23,56 @@ where
     where
         R: Repr,
     {
-        use PossumNodeKind::*;
-        match root.yaml() {
-            Yaml::Str(group) => Value(Concurrency::Concurrency(group.to_owned())),
-            Yaml::Map(concur) => {
+        OrParser::new(
+            &mut ConcurrencyStringParser,
+            &mut ConcurrencyMapParser(self.0),
+            &|root| {
+                PossumNodeKind::Invalid(
+                    ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Map])
+                        .but_found(root)
+                        .to_string(),
+                )
+            },
+        )
+        .parse_node(root)
+    }
+}
+
+struct ConcurrencyStringParser;
+struct ConcurrencyMapParser<'a>(&'a mut Annotations);
+
+impl<'a> ConcurrencyMapParser<'a> {
+    fn annotate<A>(&mut self, a: A)
+    where
+        A: Into<Annotation>,
+    {
+        self.0.add(a)
+    }
+}
+
+impl<'a, R> Parser<'a, R, Concurrency> for ConcurrencyStringParser
+where
+    R: Repr + 'a,
+{
+    fn parse_node(&mut self, root: &yaml_peg::Node<R>) -> PossumNodeKind<Concurrency>
+    where
+        R: Repr,
+    {
+        TransformParser::new(&mut StringParser, &|s| Concurrency::Concurrency(s)).parse_node(root)
+    }
+}
+
+impl<'a, R> Parser<'a, R, Concurrency> for ConcurrencyMapParser<'a>
+where
+    R: Repr + 'a,
+{
+    fn parse_node(&mut self, root: &yaml_peg::Node<R>) -> PossumNodeKind<Concurrency>
+    where
+        R: Repr,
+    {
+        match root.extract_map() {
+            Err(u) => PossumNodeKind::Invalid(u.to_string()),
+            Ok(concur) => {
                 let mut group = None;
                 let mut cancel_in_progress = None;
 
@@ -73,16 +100,11 @@ where
                     }
                 }
 
-                Value(Concurrency::Group {
+                PossumNodeKind::Value(Concurrency::Group {
                     group,
                     cancel_in_progress,
                 })
             }
-            u @ _ => Invalid(
-                ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Map])
-                    .but_found(u)
-                    .to_string(),
-            ),
         }
     }
 }

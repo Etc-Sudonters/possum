@@ -43,6 +43,45 @@ impl<T> PossumNodeKind<T> {
             _ => false,
         }
     }
+
+    pub fn map<U, F>(self, f: F) -> PossumNodeKind<U>
+    where
+        F: Fn(T) -> U,
+    {
+        use PossumNodeKind::*;
+        match self {
+            Value(t) => Value(f(t)),
+            Expr(s) => Expr(s),
+            Invalid(s) => Invalid(s),
+            Empty => Empty,
+        }
+    }
+
+    pub fn flatmap<U, F>(self, f: F) -> PossumNodeKind<U>
+    where
+        F: Fn(T) -> PossumNodeKind<U>,
+    {
+        use PossumNodeKind::*;
+        match self {
+            Value(t) => f(t),
+            Expr(s) => Expr(s),
+            Invalid(s) => Invalid(s),
+            Empty => Empty,
+        }
+    }
+
+    pub fn recover<F>(self, mut f: F) -> PossumNodeKind<T>
+    where
+        F: FnMut() -> PossumNodeKind<T>,
+    {
+        use PossumNodeKind::*;
+        match self {
+            Value(t) => Value(t),
+            Expr(s) => Expr(s),
+            Empty => Empty,
+            Invalid(_) => f(),
+        }
+    }
 }
 
 #[derive(Debug)]

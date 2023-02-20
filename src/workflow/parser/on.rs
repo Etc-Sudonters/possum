@@ -2,7 +2,7 @@ use super::event::EventParser;
 use crate::document::Annotations;
 use crate::scavenge::ast::{PossumNodeKind, PossumSeq};
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
-use crate::scavenge::parser::Parser;
+use crate::scavenge::parser::{Parser, FlatMapParser, StringParser};
 use crate::scavenge::yaml::YamlKind;
 use crate::workflow::on::{self, EventKind};
 use std::marker::PhantomData;
@@ -16,6 +16,22 @@ where
 {
     _x: PhantomData<&'a R>,
     annotations: &'a mut Annotations,
+}
+
+struct OnStringParser;
+struct OnArrayParser;
+struct OnMapParser;
+
+impl<'a, R> Parser<'a, R, on::Trigger> for OnStringParser
+where
+    R: Repr + 'a,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::Trigger>
+    where
+        R: Repr,
+    {
+        FlatMapParser(&StringParser, 
+    }
 }
 
 impl<'a, R> Parser<'a, R, on::Trigger> for OnParser<'a, R>

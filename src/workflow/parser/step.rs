@@ -6,17 +6,13 @@ use yaml_peg::Node as YamlNode;
 use crate::{
     document::{Annotation, Annotations},
     scavenge::{
-        ast::{PossumMap, PossumNodeKind},
+        ast::PossumNodeKind,
         extraction::Extract,
-        Parser, UnexpectedKey,
+        parser::{MapParser, Parser, StringParser},
+        Fallible, UnexpectedKey,
     },
     workflow::job,
 };
-
-pub enum Fallible<T> {
-    Success,
-    Failure(T),
-}
 
 struct StepBuilder {
     step: job::Step,
@@ -33,105 +29,52 @@ impl StepBuilder {
     where
         R: Repr + 'a,
     {
-        use PossumNodeKind::*;
         match key.extract_str() {
             Err(u) => Fallible::Failure(u.at(key)),
             Ok(s) => match s.to_lowercase().as_str() {
                 "id" => {
-                    self.step.id = Some({
-                        let id: PossumNodeKind<String> =
-                            value.extract_str().map(ToOwned::to_owned).into();
-                        id.at(value)
-                    });
+                    self.step.id = Some(StringParser.parse_node(value).at(value));
                     Fallible::Success
                 }
 
                 "if" => {
-                    self.step.cond = Some({
-                        let cond: PossumNodeKind<String> =
-                            value.extract_str().map(ToOwned::to_owned).into();
-                        cond.at(value)
-                    });
+                    self.step.cond = Some(StringParser.parse_node(value).at(value));
                     Fallible::Success
                 }
 
                 "name" => {
-                    self.step.name = Some({
-                        let name: PossumNodeKind<String> =
-                            value.extract_str().map(ToOwned::to_owned).into();
-                        name.at(value)
-                    });
+                    self.step.name = Some(StringParser.parse_node(value).at(value));
                     Fallible::Success
                 }
 
                 "uses" => {
-                    self.step.uses = Some({
-                        let uses: PossumNodeKind<String> =
-                            value.extract_str().map(ToOwned::to_owned).into();
-                        uses.at(value)
-                    });
+                    self.step.uses = Some(StringParser.parse_node(value).at(value));
                     Fallible::Success
                 }
 
                 "run" => {
-                    self.step.run = Some({
-                        let run: PossumNodeKind<String> =
-                            value.extract_str().map(ToOwned::to_owned).into();
-                        run.at(value)
-                    });
+                    self.step.run = Some(StringParser.parse_node(value).at(value));
                     Fallible::Success
                 }
                 "shell" => {
-                    self.step.shell = Some({
-                        let shell: PossumNodeKind<String> =
-                            value.extract_str().map(ToOwned::to_owned).into();
-                        shell.at(value)
-                    });
+                    self.step.shell = Some(StringParser.parse_node(value).at(value));
                     Fallible::Success
                 }
 
                 "with" => {
                     self.step.with = Some(
-                        match value.extract_map() {
-                            Err(u) => Invalid(u.to_string()),
-                            Ok(m) => {
-                                let mut map = PossumMap::empty();
-
-                                for (key, value) in m.iter() {
-                                    let k: PossumNodeKind<String> =
-                                        key.extract_str().map(ToOwned::to_owned).into();
-                                    let v: PossumNodeKind<String> =
-                                        value.extract_str().map(ToOwned::to_owned).into();
-                                    map.insert(k.at(key), v.at(value));
-                                }
-
-                                Value(map)
-                            }
-                        }
-                        .at(value),
+                        MapParser::new(&mut StringParser)
+                            .parse_node(value)
+                            .at(value),
                     );
                     Fallible::Success
                 }
 
                 "env" => {
                     self.step.env = Some(
-                        match value.extract_map() {
-                            Err(u) => Invalid(u.to_string()),
-                            Ok(m) => {
-                                let mut map = PossumMap::empty();
-
-                                for (key, value) in m.iter() {
-                                    let k: PossumNodeKind<String> =
-                                        key.extract_str().map(ToOwned::to_owned).into();
-                                    let v: PossumNodeKind<String> =
-                                        value.extract_str().map(ToOwned::to_owned).into();
-                                    map.insert(k.at(key), v.at(value));
-                                }
-
-                                Value(map)
-                            }
-                        }
-                        .at(value),
+                        MapParser::new(&mut StringParser)
+                            .parse_node(value)
+                            .at(value),
                     );
 
                     Fallible::Success

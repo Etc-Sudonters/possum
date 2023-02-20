@@ -2,13 +2,17 @@ use super::input::InputParser;
 use crate::document::Annotation;
 use crate::document::Annotations;
 use crate::document::AsDocumentPointer;
-use crate::scavenge::ast::{PossumMap, PossumNode, PossumNodeKind, PossumSeq};
+use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::Extract;
+use crate::scavenge::parser::SeqParser;
+use crate::scavenge::parser::StringParser;
+use crate::scavenge::parser::TransformParser;
+use crate::scavenge::MapParser;
 use crate::scavenge::{Parser, UnexpectedKey};
 use crate::workflow::on::{self, Globbed};
 use std::marker::PhantomData;
 use yaml_peg::repr::Repr;
-use yaml_peg::{Map as YamlMap, Node as YamlNode, Seq as YamlSeq};
+use yaml_peg::{Map as YamlMap, Node as YamlNode};
 
 pub struct EventParser<'a, R>
 where
@@ -67,209 +71,109 @@ where
     where
         P: AsDocumentPointer,
     {
-        use PossumNodeKind::{Invalid, Value};
         match key.to_lowercase().as_str() {
             "branches" => {
-                event.branches = Some(get_globbed_paths(value));
+                event.branches = Some(
+                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                        .parse_node(value)
+                        .at(value),
+                );
             }
+
             "branches-ignore" => {
-                event.branches_ignore = Some(get_globbed_paths(value));
+                event.branches_ignore = Some(
+                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                        .parse_node(value)
+                        .at(value),
+                );
             }
             "paths" => {
-                event.paths = Some(get_globbed_paths(value));
+                event.paths = Some(
+                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                        .parse_node(value)
+                        .at(value),
+                );
             }
             "paths-ignore" => {
-                event.paths_ignore = Some(get_globbed_paths(value));
+                event.paths_ignore = Some(
+                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                        .parse_node(value)
+                        .at(value),
+                );
             }
             "tags" => {
-                event.tags = Some(get_globbed_paths(value));
+                event.tags = Some(
+                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                        .parse_node(value)
+                        .at(value),
+                );
             }
             "tags-ignore" => {
-                event.tags_ignore = Some(get_globbed_paths(value));
+                event.tags_ignore = Some(
+                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                        .parse_node(value)
+                        .at(value),
+                );
             }
             "inputs" => {
                 event.inputs = Some(
-                    value
-                        .extract_map()
-                        .map_or_else(
-                            |err| Invalid(err.to_string()),
-                            |inputs| Value(Self::inputs(inputs)),
-                        )
+                    MapParser::new(&mut InputParser::new())
+                        .parse_node(value)
                         .at(value),
                 );
             }
             "outputs" => {
                 event.outputs = Some(
-                    value
-                        .extract_map()
-                        .map_or_else(
-                            |err| Invalid(err.to_string()),
-                            |out| Value(self.outputs(out)),
-                        )
+                    MapParser::new(&mut WorkflowOutputParser)
+                        .parse_node(value)
                         .at(value),
                 );
             }
             "secrets" => {
                 event.secrets = Some(
-                    value
-                        .extract_map()
-                        .map_or_else(
-                            |unexpected| Invalid(unexpected.to_string()),
-                            |secrets| Value(self.secrets(secrets)),
-                        )
+                    MapParser::new(&mut InheritedSecretParser)
+                        .parse_node(value)
                         .at(value),
                 );
             }
             s => self.annotate(UnexpectedKey::at(&s.to_owned(), p)),
         }
-
-        fn get_globbed_paths<'a, R>(root: &YamlNode<R>) -> PossumNode<PossumSeq<Globbed>>
-        where
-            R: Repr + 'a,
-        {
-            match root.extract_seq() {
-                Ok(seq) => Value(EventParser::globbed_paths(seq)),
-                Err(u) => Invalid(u.to_string()),
-            }
-            .at(root)
-        }
     }
+}
 
-    fn globbed_paths(root: &YamlSeq<R>) -> PossumSeq<Globbed> {
-        root.into_iter()
-            .map(|n| {
-                match n.extract_str() {
-                    Ok(s) => PossumNodeKind::Value(Globbed::new(s)),
-                    Err(u) => PossumNodeKind::Invalid(u.to_string()),
-                }
-                .at(n)
-            })
-            .collect()
-    }
+struct InheritedSecretParser;
+struct WorkflowOutputParser;
 
-    fn inputs(root: &YamlMap<R>) -> PossumMap<String, on::WorkflowInput> {
-        use PossumNodeKind::*;
-        let mut inputs = PossumMap::empty();
-        for (key, value) in root.iter() {
-            let k = key
-                .extract_str()
-                .map_or_else(|u| Invalid(u.to_string()), |s| Value(s.to_owned()))
-                .at(key);
-
-            let v = InputParser::new().parse_node(value).at(value);
-
-            inputs.insert(k, v)
-        }
-        inputs
-    }
-
-    fn outputs(&mut self, root: &YamlMap<R>) -> PossumMap<String, on::WorkflowOutput> {
-        use PossumNodeKind::*;
-        let mut outputs = PossumMap::empty();
-        for (key, value) in root.iter() {
-            let k = key
-                .extract_str()
-                .map_or_else(
-                    |unexpected| Invalid(unexpected.to_string()),
-                    |key| Value(key.to_owned()),
-                )
-                .at(key);
-
-            let v = match value.extract_map() {
-                Ok(m) => self.output(m),
-                Err(u) => Invalid(u.to_string()),
-            }
-            .at(value);
-
-            outputs.insert(k, v);
-        }
-        outputs
-    }
-
-    fn secrets(&mut self, root: &YamlMap<R>) -> PossumMap<String, on::InheritedSecret> {
-        use PossumNodeKind::*;
-        let mut secrets = PossumMap::empty();
-        for (key, secret) in root.iter() {
-            let k = key
-                .extract_str()
-                .map_or_else(
-                    |unexpected| Invalid(unexpected.to_string()),
-                    |key| Value(key.to_owned()),
-                )
-                .at(key);
-
-            let v = match secret.extract_map() {
-                Ok(secret) => self.secret(secret),
-                Err(unexpected) => Invalid(unexpected.to_string()),
-            }
-            .at(secret);
-
-            secrets.insert(k, v);
-        }
-        secrets
-    }
-
-    fn output(&mut self, map: &YamlMap<R>) -> PossumNodeKind<on::WorkflowOutput> {
-        use PossumNodeKind::*;
-        let mut output = on::WorkflowOutput::default();
-
-        for (key, value) in map.iter() {
-            let v = value
-                .extract_str()
-                .map_or_else(
-                    |unexpected| Invalid(unexpected.to_string()),
-                    |v| Value(v.to_owned()),
-                )
-                .at(value);
-
-            match key.extract_str() {
-                Ok(s) => match s.to_lowercase().as_str() {
-                    "description" => {
-                        output.description = Some(v);
-                    }
-                    "value" => {
-                        output.value = Some(v);
-                    }
-                    s => self.annotate(UnexpectedKey::at(&s.to_owned(), key)),
-                },
-                Err(unexpected) => self.annotate(Annotation::fatal(key, &unexpected)),
+impl<'a, R> Parser<'a, R, on::InheritedSecret> for InheritedSecretParser
+where
+    R: Repr + 'a,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::InheritedSecret>
+    where
+        R: Repr,
+    {
+        match root.extract_map() {
+            Err(u) => PossumNodeKind::Invalid(u.to_string()),
+            Ok(m) => {
+                todo!()
             }
         }
-
-        PossumNodeKind::Value(output)
     }
+}
 
-    fn secret(&mut self, map: &YamlMap<R>) -> PossumNodeKind<on::InheritedSecret> {
-        use PossumNodeKind::*;
-        let mut secret = on::InheritedSecret::default();
-
-        for (key, value) in map.iter() {
-            match key.extract_str() {
-                Err(unexpected) => self.annotate(unexpected.at(key)),
-                Ok(name) => match name.to_lowercase().as_str() {
-                    "description" => {
-                        let description = match value.extract_str() {
-                            Ok(s) => Value(s.to_owned()),
-                            Err(u) => Invalid(u.to_string()),
-                        }
-                        .at(value);
-
-                        secret.description = Some(description);
-                    }
-                    "required" => {
-                        let required = match value.extract_bool() {
-                            Ok(b) => Value(b.clone()),
-                            Err(u) => Invalid(u.to_string()),
-                        }
-                        .at(value);
-
-                        secret.required = Some(required);
-                    }
-                    s => self.annotate(UnexpectedKey::at(&s.to_owned(), value)),
-                },
+impl<'a, R> Parser<'a, R, on::WorkflowOutput> for WorkflowOutputParser
+where
+    R: Repr + 'a,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::WorkflowOutput>
+    where
+        R: Repr,
+    {
+        match root.extract_map() {
+            Err(u) => PossumNodeKind::Invalid(u.to_string()),
+            Ok(m) => {
+                todo!()
             }
         }
-
-        Value(secret)
     }
 }
