@@ -134,7 +134,7 @@ impl<'a> EventParser<'a> {
                         .at(value),
                 );
             }
-            s => self.annotate(UnexpectedKey::at(&s.to_owned(), p)),
+            s => self.annotate(UnexpectedKey::from(s).at(value)),
         }
     }
 }

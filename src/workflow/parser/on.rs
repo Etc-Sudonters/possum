@@ -2,7 +2,7 @@ use super::event::EventParser;
 use crate::document::Annotations;
 use crate::scavenge::ast::{PossumNodeKind, PossumSeq};
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
-use crate::scavenge::parser::{FlatMapParser, Parser, SeqParser, StrParser, TransformParser};
+use crate::scavenge::parser::{FlatMapParser, Parser, SeqParser, StringParser, TransformParser};
 use crate::scavenge::yaml::YamlKind;
 use crate::workflow::on::{self, BadEvent, EventKind};
 use std::marker::PhantomData;
@@ -31,10 +31,13 @@ where
     where
         R: Repr,
     {
-        FlatMapParser::new(&mut StrParser::new(), &|s| match EventKind::fromstr(s) {
-            Ok(ek) => PossumNodeKind::Value(ek),
-            Err(_) => PossumNodeKind::Invalid(BadEvent::Unknown(s.to_owned()).to_string()),
-        })
+        FlatMapParser::new(
+            &mut StringParser,
+            &|s| match EventKind::fromstr(s.as_str()) {
+                Ok(ek) => PossumNodeKind::Value(ek),
+                Err(_) => PossumNodeKind::Invalid(BadEvent::Unknown(s).to_string()),
+            },
+        )
         .parse_node(root)
     }
 }

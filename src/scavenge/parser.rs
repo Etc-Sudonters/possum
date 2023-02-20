@@ -3,34 +3,31 @@ use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
 
 use super::ast::{PossumNode, PossumNodeKind};
-use crate::document::{Annotation, AsDocumentPointer, DocumentPointer};
+use crate::document::{Annotation, Annotations, AsDocumentPointer, DocumentPointer};
 use crate::scavenge::ast::{PossumMap, PossumSeq};
 use crate::scavenge::extraction::Extract;
 use std::fmt::Display;
-use std::marker::PhantomData;
 
-pub struct UnexpectedKey<'a, S, P>(&'a S, &'a P)
-where
-    P: AsDocumentPointer,
-    S: Display;
+pub struct UnexpectedKey<'a>(&'a str);
 
-impl<'a, S, P> UnexpectedKey<'a, S, P>
-where
-    P: AsDocumentPointer,
-    S: Display,
-{
-    pub fn at(s: &'a S, p: &'a P) -> UnexpectedKey<'a, S, P> {
-        UnexpectedKey(s, p)
+impl<'a> UnexpectedKey<'a> {
+    pub fn at<P>(self, loc: &P) -> Annotation
+    where
+        P: AsDocumentPointer,
+    {
+        Annotation::error(loc, &self)
     }
 }
 
-impl<'a, S, P> Into<Annotation> for UnexpectedKey<'a, S, P>
-where
-    P: AsDocumentPointer,
-    S: Display,
-{
-    fn into(self) -> Annotation {
-        Annotation::error(self.1, self.0)
+impl<'a> Display for UnexpectedKey<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Unexpected key: {}", self.0)
+    }
+}
+
+impl<'a> From<&'a str> for UnexpectedKey<'a> {
+    fn from(value: &'a str) -> Self {
+        UnexpectedKey(value)
     }
 }
 
@@ -81,26 +78,6 @@ where
         R: Repr;
 }
 
-pub struct StrParser<'a>(PhantomData<&'a ()>);
-
-impl<'a> StrParser<'a> {
-    pub fn new() -> StrParser<'a> {
-        StrParser(PhantomData)
-    }
-}
-
-impl<'a, R> Parser<R, &'a str> for StrParser<'a>
-where
-    R: Repr,
-{
-    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<&'a str>
-    where
-        R: Repr,
-    {
-        root.extract_str().into()
-    }
-}
-
 pub struct StringParser;
 
 impl<R> Parser<R, String> for StringParser
@@ -111,7 +88,7 @@ where
     where
         R: Repr,
     {
-        TransformParser::new(&mut StrParser::new(), &ToOwned::to_owned).parse_node(root)
+        root.extract_str().map(ToOwned::to_owned).into()
     }
 }
 
@@ -133,7 +110,6 @@ pub struct MapParser<'a, R, T>
 where
     R: Repr,
 {
-    _x: PhantomData<R>,
     parser: &'a mut dyn Parser<R, T>,
 }
 
@@ -142,10 +118,7 @@ where
     R: Repr,
 {
     pub fn new(parser: &'a mut dyn Parser<R, T>) -> MapParser<R, T> {
-        MapParser {
-            _x: PhantomData,
-            parser,
-        }
+        MapParser { parser }
     }
 }
 
@@ -165,7 +138,7 @@ where
 
                 for (key, value) in m.iter() {
                     let k: PossumNodeKind<String> = key.extract_str().map(ToOwned::to_owned).into();
-                    let v: PossumNodeKind<T> = self.parser.parse_node(root);
+                    let v: PossumNodeKind<T> = self.parser.parse_node(value);
 
                     map.insert(k.at(key), v.at(value));
                 }
@@ -307,5 +280,97 @@ where
             .parse_node(root)
             .recover(|| self.rhs.parse_node(root))
             .recover(|| (self.default)(root))
+    }
+}
+
+pub struct Pluralize<'a, R, T>(&'a mut dyn Parser<R, T>);
+
+impl<'a, R, T> Pluralize<'a, R, T> {
+    pub fn new(inner: &'a mut dyn Parser<R, T>) -> Pluralize<'a, R, T> {
+        Pluralize(inner)
+    }
+}
+
+impl<'a, R, T> Parser<R, PossumSeq<T>> for Pluralize<'a, R, T>
+where
+    R: Repr,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<PossumSeq<T>>
+    where
+        R: Repr,
+    {
+        PossumNodeKind::Value(self.0.parse_node(root).at(root).into())
+    }
+}
+
+pub trait Builder<T> {
+    fn build<'a, P, R>(
+        &mut self,
+        item: &mut T,
+        key: &str,
+        value: &YamlNode<R>,
+        pointer: &P,
+        annotations: &'a mut Annotations,
+    ) where
+        P: AsDocumentPointer,
+        R: Repr;
+}
+
+pub struct ObjectParser<'a, B, F, T>
+where
+    B: Builder<T>,
+    F: Fn() -> T,
+{
+    builder: B,
+    default: F,
+    annotations: &'a mut Annotations,
+}
+
+impl<'a, B, F, T> ObjectParser<'a, B, F, T>
+where
+    B: Builder<T>,
+    F: Fn() -> T,
+{
+    pub fn new(
+        builder: B,
+        default: F,
+        annotations: &'a mut Annotations,
+    ) -> ObjectParser<'a, B, F, T> {
+        ObjectParser {
+            builder,
+            default,
+            annotations,
+        }
+    }
+}
+
+impl<'a, B, F, R, T> Parser<R, T> for ObjectParser<'a, B, F, T>
+where
+    R: Repr,
+    B: Builder<T>,
+    F: Fn() -> T,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<T>
+    where
+        R: Repr,
+    {
+        use PossumNodeKind::*;
+        match root.extract_map() {
+            Err(u) => Invalid(u.to_string()),
+            Ok(m) => {
+                let mut item = (self.default)();
+
+                for (key, value) in m.iter() {
+                    match key.extract_str() {
+                        Err(u) => self.annotations.add(u.at(key)),
+                        Ok(s) => self
+                            .builder
+                            .build(&mut item, s, value, key, self.annotations),
+                    }
+                }
+
+                Value(item)
+            }
+        }
     }
 }

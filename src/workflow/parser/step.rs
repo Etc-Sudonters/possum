@@ -78,7 +78,7 @@ impl StepBuilder {
                     Fallible::Success
                 }
 
-                k @ _ => Fallible::Failure(UnexpectedKey::at(&k.to_owned(), key).into()),
+                k @ _ => Fallible::Failure(UnexpectedKey::from(k).at(key)),
             },
         }
     }

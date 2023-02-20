@@ -94,9 +94,7 @@ impl<'a> WorkflowParser<'a> {
                         .at(value),
                 );
             }
-            s => self
-                .annotations
-                .add(UnexpectedKey::at(&s.to_owned(), value)),
+            s @ _ => self.annotations.add(UnexpectedKey::from(s).at(value)),
         }
     }
 }

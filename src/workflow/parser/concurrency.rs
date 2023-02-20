@@ -95,7 +95,9 @@ where
                                 })
                             }
 
-                            u @ _ => self.annotate(UnexpectedKey::at(&u.to_owned(), value)),
+                            u @ _ => {
+                                self.annotate(UnexpectedKey::from(u).at(value));
+                            }
                         },
                     }
                 }
