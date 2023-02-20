@@ -8,6 +8,8 @@ use crate::workflow::Concurrency;
 use yaml_peg::repr::Repr;
 
 pub struct ConcurrencyParser<'a>(&'a mut Annotations);
+struct ConcurrencyStringParser;
+struct ConcurrencyMapParser<'a>(&'a mut Annotations);
 
 impl<'a> ConcurrencyParser<'a> {
     pub fn new(annotations: &'a mut Annotations) -> ConcurrencyParser<'a> {
@@ -37,9 +39,6 @@ where
         .parse_node(root)
     }
 }
-
-struct ConcurrencyStringParser;
-struct ConcurrencyMapParser<'a>(&'a mut Annotations);
 
 impl<'a> ConcurrencyMapParser<'a> {
     fn annotate<A>(&mut self, a: A)

@@ -1,97 +1,128 @@
+use crate::document::Annotations;
 use crate::scavenge::ast::PossumNodeKind;
-use crate::scavenge::extraction::{ExpectedYaml, Extract};
-use crate::scavenge::parser::{BoolParser, SeqParser, StringParser};
+use crate::scavenge::extraction::ExpectedYaml;
+use crate::scavenge::parser::{
+    BoolParser, Builder, FlatMapParser, NumberParser, ObjectParser, OrParser, SeqParser,
+    StringParser, TransformParser,
+};
 use crate::scavenge::yaml::YamlKind;
-use crate::scavenge::Parser;
-use crate::workflow::on;
-use std::marker::PhantomData;
-use std::str::FromStr;
+use crate::scavenge::{Parser, UnexpectedKey};
+use crate::workflow::on::{self, BadInputType};
 use yaml_peg::repr::Repr;
-use yaml_peg::{Node as YamlNode, Yaml};
+use yaml_peg::Node as YamlNode;
 
-pub struct InputParser<R>(PhantomData<R>)
-where
-    R: Repr;
+pub struct InputParser<'a>(&'a mut Annotations);
+struct InputBuilder;
+struct InputDefaultParser;
+struct InputTypeParser;
 
-impl<R> Parser<R, on::WorkflowInput> for InputParser<R>
-where
-    R: Repr,
-{
-    fn parse_node(&mut self, root: &yaml_peg::Node<R>) -> PossumNodeKind<on::WorkflowInput>
-    where
-        R: yaml_peg::repr::Repr,
-    {
-        use PossumNodeKind::*;
-        let mut input = on::WorkflowInput::default();
-
-        for (key, value) in root.extract_map().unwrap().iter() {
-            match key.extract_str() {
-                Ok(s) => match s.to_lowercase().as_str() {
-                    "description" => {
-                        input.description = Some(StringParser.parse_node(value).at(value));
-                    }
-                    "default" => {
-                        input.default = Some(Self::default_value(value).at(value));
-                    }
-                    "required" => {
-                        input.required = Some(BoolParser.parse_node(value).at(value));
-                    }
-                    "type" => {
-                        input.input_type = Some(
-                            value
-                                .extract_str()
-                                .map_or_else(
-                                    |unexpected| Invalid(unexpected.to_string()),
-                                    |maybe_type| {
-                                        on::WorkflowInputType::from_str(maybe_type).map_or_else(
-                                            |_| {
-                                                Invalid(format!("unknown input type: {maybe_type}"))
-                                            },
-                                            Value,
-                                        )
-                                    },
-                                )
-                                .at(value),
-                        );
-                    }
-                    "choices" => {
-                        input.choices = Some(
-                            SeqParser::new(&mut StringParser)
-                                .parse_node(value)
-                                .at(value),
-                        );
-                    }
-                    _ => {}
-                },
-                Err(e) => {}
-            }
-        }
-
-        PossumNodeKind::Value(input)
+impl<'a> InputParser<'a> {
+    pub fn new(annotations: &'a mut Annotations) -> InputParser<'a> {
+        InputParser(annotations)
     }
 }
 
-impl<R> InputParser<R>
+impl<'a, R> Parser<R, on::WorkflowInput> for InputParser<'a>
 where
     R: Repr,
 {
-    pub fn new() -> InputParser<R> {
-        InputParser(PhantomData)
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::WorkflowInput>
+    where
+        R: Repr,
+    {
+        ObjectParser::new(InputBuilder, &on::WorkflowInput::default, &mut self.0).parse_node(root)
     }
+}
 
-    fn default_value(root: &YamlNode<R>) -> PossumNodeKind<on::WorkflowInputDefault> {
-        use on::WorkflowInputDefault::*;
-        use PossumNodeKind::{Invalid, Value};
+impl<R> Parser<R, on::WorkflowInputType> for InputTypeParser
+where
+    R: Repr,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::WorkflowInputType>
+    where
+        R: Repr,
+    {
+        FlatMapParser::new(
+            &mut StringParser,
+            &|s| match on::WorkflowInputType::fromstr(s.as_str()) {
+                Ok(input_type) => PossumNodeKind::Value(input_type),
+                Err(_) => PossumNodeKind::Invalid(BadInputType::Unknown(s).to_string()),
+            },
+        )
+        .parse_node(root)
+    }
+}
 
-        match root.yaml() {
-            Yaml::Str(s) => Value(Str(s.to_owned())),
-            Yaml::Bool(b) => Value(Bool(b.clone())),
-            Yaml::Int(i) => Value(Number(i.clone())),
-            _ => Invalid(
-                ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Number, YamlKind::Bool])
-                    .but_found(root)
-                    .to_string(),
+impl<R> Parser<R, on::WorkflowInputDefault> for InputDefaultParser
+where
+    R: Repr,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<on::WorkflowInputDefault>
+    where
+        R: Repr,
+    {
+        let mut strs = StringParser;
+        let mut bools = BoolParser;
+        let mut nums = NumberParser;
+
+        OrParser::new(
+            &mut TransformParser::new(&mut strs, &|s| on::WorkflowInputDefault::Str(s)),
+            &mut OrParser::new(
+                &mut TransformParser::new(&mut bools, &|b| on::WorkflowInputDefault::Bool(b)),
+                &mut TransformParser::new(&mut nums, &|n| on::WorkflowInputDefault::Number(n)),
+                &|r| {
+                    PossumNodeKind::Invalid(
+                        ExpectedYaml::AnyOf(vec![YamlKind::Number, YamlKind::Str, YamlKind::Bool])
+                            .but_found(r)
+                            .to_string(),
+                    )
+                },
             ),
+            &|r| {
+                PossumNodeKind::Invalid(
+                    ExpectedYaml::AnyOf(vec![YamlKind::Number, YamlKind::Str, YamlKind::Bool])
+                        .but_found(r)
+                        .to_string(),
+                )
+            },
+        )
+        .parse_node(root)
+    }
+}
+
+impl Builder<on::WorkflowInput> for InputBuilder {
+    fn build<'a, P, R>(
+        &mut self,
+        item: &mut on::WorkflowInput,
+        key: &str,
+        value: &YamlNode<R>,
+        pointer: &P,
+        annotations: &'a mut crate::document::Annotations,
+    ) where
+        P: crate::document::AsDocumentPointer,
+        R: Repr,
+    {
+        match key.to_lowercase().as_str() {
+            "description" => {
+                item.description = Some(StringParser.parse_node(value).at(value));
+            }
+            "default" => {
+                item.default = Some(InputDefaultParser.parse_node(value).at(value));
+            }
+            "required" => {
+                item.required = Some(BoolParser.parse_node(value).at(value));
+            }
+            "type" => {
+                item.input_type = Some(InputTypeParser.parse_node(value).at(value));
+            }
+            "choices" => {
+                item.choices = Some(
+                    SeqParser::new(&mut StringParser)
+                        .parse_node(value)
+                        .at(value),
+                );
+            }
+            s @ _ => annotations.add(UnexpectedKey::from(s).at(pointer)),
         }
     }
 }

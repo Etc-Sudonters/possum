@@ -85,12 +85,12 @@ pub enum ExpectedYaml {
 }
 
 impl ExpectedYaml {
-    pub fn but_found<Y>(self, n: Y) -> UnexpectedYaml
+    pub fn but_found<Y>(&self, n: Y) -> UnexpectedYaml
     where
         Y: IntoYamlKind,
     {
         UnexpectedYaml {
-            expected: self,
+            expected: self.clone(),
             unexpected: n.into_yaml_kind(),
         }
     }

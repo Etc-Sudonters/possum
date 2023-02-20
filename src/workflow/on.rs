@@ -166,7 +166,7 @@ possum_node_type!(
 #[derive(Debug)]
 pub enum WorkflowInputDefault {
     Str(String),
-    Number(String),
+    Number(f64),
     Bool(bool),
 }
 
@@ -176,6 +176,24 @@ pub enum WorkflowInputType {
     Number,
     Bool,
     Choice,
+}
+
+impl WorkflowInputType {
+    pub fn fromstr(raw: &str) -> Result<WorkflowInputType, BadInputType> {
+        WorkflowInputType::from_str(raw).map_err(|_| BadInputType::Unknown(raw.to_owned()))
+    }
+}
+
+pub enum BadInputType {
+    Unknown(String),
+}
+
+impl Display for BadInputType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BadInputType::Unknown(s) => write!(f, "unknown type {s}"),
+        }
+    }
 }
 
 possum_node_type!(

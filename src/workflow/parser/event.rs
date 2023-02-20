@@ -2,7 +2,7 @@ use super::input::InputParser;
 use crate::document::Annotations;
 use crate::document::AsDocumentPointer;
 use crate::scavenge::ast::PossumNodeKind;
-use crate::scavenge::extraction::Extract;
+use crate::scavenge::parser::BoolParser;
 use crate::scavenge::parser::Builder;
 use crate::scavenge::parser::ObjectParser;
 use crate::scavenge::parser::SeqParser;
@@ -15,14 +15,17 @@ use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
 
 pub struct EventParser<'a>(&'a mut Annotations);
+struct EventBuilder;
+struct InheritedSecretParser<'a>(&'a mut Annotations);
+struct InheritedSecretBuilder;
+struct WorkflowOutputParser<'a>(&'a mut Annotations);
+struct WorkflowOutputBuilder;
 
 impl<'a> EventParser<'a> {
     pub fn new(annotations: &'a mut Annotations) -> EventParser<'a> {
         EventParser(annotations)
     }
 }
-
-struct EventBuilder;
 
 impl<'a, R> Parser<R, on::Event> for EventParser<'a>
 where
@@ -39,7 +42,7 @@ where
 impl Builder<on::Event> for EventBuilder {
     fn build<'a, P, R>(
         &mut self,
-        event: &mut on::Event,
+        item: &mut on::Event,
         key: &str,
         value: &YamlNode<R>,
         pointer: &P,
@@ -50,7 +53,7 @@ impl Builder<on::Event> for EventBuilder {
     {
         match key {
             "branches" => {
-                event.branches = Some(
+                item.branches = Some(
                     SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
                         .parse_node(value)
                         .at(value),
@@ -58,57 +61,57 @@ impl Builder<on::Event> for EventBuilder {
             }
 
             "branches-ignore" => {
-                event.branches_ignore = Some(
+                item.branches_ignore = Some(
                     SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "paths" => {
-                event.paths = Some(
+                item.paths = Some(
                     SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "paths-ignore" => {
-                event.paths_ignore = Some(
+                item.paths_ignore = Some(
                     SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "tags" => {
-                event.tags = Some(
+                item.tags = Some(
                     SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "tags-ignore" => {
-                event.tags_ignore = Some(
+                item.tags_ignore = Some(
                     SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "inputs" => {
-                event.inputs = Some(
-                    MapParser::new(&mut StringParser, &mut InputParser::new())
+                item.inputs = Some(
+                    MapParser::new(&mut StringParser, &mut InputParser::new(annotations))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "outputs" => {
-                event.outputs = Some(
-                    MapParser::new(&mut StringParser, &mut WorkflowOutputParser)
+                item.outputs = Some(
+                    MapParser::new(&mut StringParser, &mut WorkflowOutputParser(annotations))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "secrets" => {
-                event.secrets = Some(
-                    MapParser::new(&mut StringParser, &mut InheritedSecretParser)
+                item.secrets = Some(
+                    MapParser::new(&mut StringParser, &mut InheritedSecretParser(annotations))
                         .parse_node(value)
                         .at(value),
                 );
@@ -118,10 +121,7 @@ impl Builder<on::Event> for EventBuilder {
     }
 }
 
-struct InheritedSecretParser;
-struct WorkflowOutputParser;
-
-impl<R> Parser<R, on::InheritedSecret> for InheritedSecretParser
+impl<'a, R> Parser<R, on::InheritedSecret> for InheritedSecretParser<'a>
 where
     R: Repr,
 {
@@ -129,16 +129,16 @@ where
     where
         R: Repr,
     {
-        match root.extract_map() {
-            Err(u) => PossumNodeKind::Invalid(u.to_string()),
-            Ok(m) => {
-                todo!()
-            }
-        }
+        ObjectParser::new(
+            InheritedSecretBuilder,
+            &on::InheritedSecret::default,
+            self.0,
+        )
+        .parse_node(root)
     }
 }
 
-impl<R> Parser<R, on::WorkflowOutput> for WorkflowOutputParser
+impl<'a, R> Parser<R, on::WorkflowOutput> for WorkflowOutputParser<'a>
 where
     R: Repr,
 {
@@ -146,10 +146,56 @@ where
     where
         R: Repr,
     {
-        match root.extract_map() {
-            Err(u) => PossumNodeKind::Invalid(u.to_string()),
-            Ok(m) => {
-                todo!()
+        ObjectParser::new(WorkflowOutputBuilder, &on::WorkflowOutput::default, self.0)
+            .parse_node(root)
+    }
+}
+
+impl Builder<on::InheritedSecret> for InheritedSecretBuilder {
+    fn build<'a, P, R>(
+        &mut self,
+        item: &mut on::InheritedSecret,
+        key: &str,
+        value: &YamlNode<R>,
+        pointer: &P,
+        annotations: &'a mut Annotations,
+    ) where
+        P: AsDocumentPointer,
+        R: Repr,
+    {
+        match key {
+            "description" => {
+                item.description = Some(StringParser.parse_node(value).at(value));
+            }
+            "required" => {
+                item.required = Some(BoolParser.parse_node(value).at(value));
+            }
+            unexpected @ _ => annotations.add(UnexpectedKey::from(unexpected).at(pointer)),
+        }
+    }
+}
+
+impl Builder<on::WorkflowOutput> for WorkflowOutputBuilder {
+    fn build<'a, P, R>(
+        &mut self,
+        item: &mut on::WorkflowOutput,
+        key: &str,
+        value: &YamlNode<R>,
+        pointer: &P,
+        annotations: &'a mut Annotations,
+    ) where
+        P: AsDocumentPointer,
+        R: Repr,
+    {
+        match key {
+            "description" => {
+                item.description = Some(StringParser.parse_node(value).at(value));
+            }
+            "value" => {
+                item.value = Some(StringParser.parse_node(value).at(value));
+            }
+            unexpected @ _ => {
+                annotations.add(UnexpectedKey::from(unexpected).at(pointer));
             }
         }
     }
