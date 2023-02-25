@@ -6,6 +6,12 @@ use strum::Display;
 #[derive(Debug)]
 pub struct Annotations(Vec<Annotation>);
 
+pub trait Annotatable {
+    fn annotate<A>(&mut self, annotation: A)
+    where
+        A: Into<Annotation>;
+}
+
 impl Annotations {
     pub fn new() -> Annotations {
         Annotations(Vec::with_capacity(16))

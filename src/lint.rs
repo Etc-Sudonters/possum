@@ -1,7 +1,7 @@
-use crate::document::Annotation;
+use crate::{document::Annotatable, scavenge::ast::PossumNode};
 
 pub trait Linter<T> {
-    fn lint<I>(&self, target: &I) -> Vec<Annotation>
+    fn lint<A>(&self, root: &PossumNode<T>, annotations: &mut A)
     where
-        I: AsRef<T>;
+        A: Annotatable;
 }

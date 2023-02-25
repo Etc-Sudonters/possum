@@ -1,5 +1,6 @@
 use crate::document::{AsDocumentPointer, DocumentPointer};
-use std::iter::{FromIterator, IntoIterator};
+use std::iter::{FromIterator, IntoIterator, Zip};
+use std::slice::Iter;
 
 #[derive(Debug)]
 pub struct PossumNode<T> {
@@ -16,8 +17,27 @@ impl<T> PossumNode<T> {
         self.location.clone()
     }
 
-    pub fn data(&self) -> &PossumNodeKind<T> {
+    pub fn kind(&self) -> &PossumNodeKind<T> {
         &self.kind
+    }
+
+    pub fn value(&self) -> Option<&T> {
+        match self.kind() {
+            PossumNodeKind::Value(t) => Some(t),
+            _ => None,
+        }
+    }
+}
+
+impl<T> AsDocumentPointer for &PossumNode<T> {
+    fn as_document_pointer(&self) -> DocumentPointer {
+        self.loc()
+    }
+}
+
+impl<T> AsDocumentPointer for PossumNode<T> {
+    fn as_document_pointer(&self) -> DocumentPointer {
+        AsDocumentPointer::as_document_pointer(&self)
     }
 }
 
@@ -98,27 +118,58 @@ impl<K, V> PossumMap<K, V> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.keys.len()
+    }
+
     pub fn insert(&mut self, k: PossumNode<K>, v: PossumNode<V>) {
         self.keys.push(k);
         self.values.push(v);
     }
-}
 
-impl<K, V> FromIterator<(PossumNode<K>, PossumNode<V>)> for PossumMap<K, V> {
-    fn from_iter<T: IntoIterator<Item = (PossumNode<K>, PossumNode<V>)>>(iter: T) -> Self {
-        let mut map = PossumMap::empty();
+    pub fn is_empty(&self) -> bool {
+        self.keys.is_empty()
+    }
 
-        for (k, v) in iter.into_iter() {
-            map.insert(k, v)
-        }
-
-        map
+    pub fn iter(&self) -> Zip<Iter<'_, PossumNode<K>>, Iter<'_, PossumNode<V>>> {
+        self.keys.iter().zip(self.values.iter()).into_iter()
     }
 }
 
 #[derive(Debug, Default)]
 pub struct PossumSeq<T> {
     entries: Vec<PossumNode<T>>,
+}
+
+impl<T> PossumSeq<T> {
+    pub fn empty() -> PossumSeq<T> {
+        PossumSeq {
+            entries: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, t: PossumNode<T>) {
+        self.entries.push(t)
+    }
+
+    pub fn new<I>(nodes: I) -> PossumSeq<T>
+    where
+        I: IntoIterator<Item = PossumNode<T>>,
+    {
+        nodes.into_iter().collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn iter(&self) -> Iter<'_, PossumNode<T>> {
+        self.entries.iter()
+    }
 }
 
 impl<T> Into<PossumSeq<T>> for PossumNode<T> {
@@ -148,18 +199,6 @@ impl<T> FromIterator<PossumNode<T>> for PossumSeq<T> {
 impl<T> Into<PossumSeq<T>> for Vec<PossumNode<T>> {
     fn into(self) -> PossumSeq<T> {
         PossumSeq { entries: self }
-    }
-}
-
-impl<T> PossumSeq<T> {
-    pub fn empty() -> PossumSeq<T> {
-        PossumSeq {
-            entries: Vec::new(),
-        }
-    }
-
-    pub fn push(&mut self, t: PossumNode<T>) {
-        self.entries.push(t)
     }
 }
 
