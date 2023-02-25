@@ -7,6 +7,7 @@ use crate::document::{Annotation, Annotations, AsDocumentPointer, DocumentPointe
 use crate::scavenge::ast::{PossumMap, PossumSeq};
 use crate::scavenge::extraction::Extract;
 use std::fmt::Display;
+use std::marker::PhantomData;
 
 #[derive(Debug)]
 pub enum ParseFailure {
@@ -18,9 +19,11 @@ pub enum ParseFailure {
 
 pub struct UnexpectedKey<'a>(&'a str);
 pub struct StringParser;
+pub struct ExprParser<T>(PhantomData<T>);
 pub struct BoolParser;
 pub struct NumberParser;
 pub type InnerParser<'a, R, T> = &'a mut dyn Parser<R, T>;
+pub type DefaultValue<'a, R, T> = &'a dyn Fn(&YamlNode<R>) -> PossumNodeKind<T>;
 pub struct StringMapParser(StringParser, StringParser);
 pub struct MapParser<'a, R, K, V>
 where
@@ -166,6 +169,26 @@ where
         R: Repr,
     {
         root.extract_str().map(ToOwned::to_owned).into()
+    }
+}
+
+impl<T> ExprParser<T> {
+    pub fn new() -> ExprParser<T> {
+        ExprParser(PhantomData)
+    }
+}
+
+impl<R, T> Parser<R, T> for ExprParser<T>
+where
+    R: Repr,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<T>
+    where
+        R: Repr,
+    {
+        StringParser
+            .parse_node(root)
+            .flatmap(|s| PossumNodeKind::Expr(s))
     }
 }
 
@@ -401,5 +424,43 @@ where
                 Value(item)
             }
         }
+    }
+}
+
+pub struct MaybeExprParser<'a, R, T>
+where
+    R: Repr,
+{
+    inner: InnerParser<'a, R, T>,
+    default_value: DefaultValue<'a, R, T>,
+}
+
+impl<'a, R, T> MaybeExprParser<'a, R, T>
+where
+    R: Repr,
+{
+    pub fn new(
+        inner: InnerParser<'a, R, T>,
+        default_value: DefaultValue<'a, R, T>,
+    ) -> MaybeExprParser<'a, R, T> {
+        MaybeExprParser {
+            inner,
+            default_value,
+        }
+    }
+}
+
+impl<'a, R, T> Parser<R, T> for MaybeExprParser<'a, R, T>
+where
+    R: Repr,
+{
+    fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<T>
+    where
+        R: Repr,
+    {
+        OrParser::new(&mut ExprParser::new(), self.inner, &|r| {
+            (self.default_value)(r)
+        })
+        .parse_node(root)
     }
 }

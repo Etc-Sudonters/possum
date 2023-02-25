@@ -5,6 +5,7 @@ mod job;
 mod on;
 mod permissions;
 mod step;
+mod strategy;
 use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
 
