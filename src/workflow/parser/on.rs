@@ -2,11 +2,11 @@ use super::event::EventParser;
 use crate::document::Annotations;
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::ExpectedYaml;
-use crate::scavenge::parser::{
-    FlatMapParser, OrParser, Parser, SeqParser, StringParser, TransformParser,
+use crate::scavenge::parsers::{
+    FlatMapParser, MapParser, OrParser, SeqParser, StringParser, TransformParser,
 };
 use crate::scavenge::yaml::YamlKind;
-use crate::scavenge::MapParser;
+use crate::scavenge::Parser;
 use crate::workflow::on::{self, BadEvent, EventKind};
 use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
@@ -33,8 +33,8 @@ where
         R: Repr,
     {
         FlatMapParser::new(
-            &mut StringParser,
-            &|s| match EventKind::fromstr(s.as_str()) {
+            StringParser,
+            |s| match EventKind::fromstr(s.as_str()) {
                 Ok(ek) => PossumNodeKind::Value(ek),
                 Err(_) => PossumNodeKind::Invalid(BadEvent::Unknown(s).to_string()),
             },
@@ -64,8 +64,8 @@ where
         R: Repr,
     {
         TransformParser::new(
-            &mut SeqParser::new(&mut EventKindParser),
-            &Into::<on::Trigger>::into,
+            SeqParser::new(EventKindParser),
+            Into::<on::Trigger>::into,
         )
         .parse_node(root)
     }
@@ -79,7 +79,7 @@ where
     where
         R: Repr,
     {
-        MapParser::new(&mut EventKindParser, &mut EventParser::new(self.0))
+        MapParser::new(EventKindParser, EventParser::new(self.0))
             .parse_node(root)
             .map(Into::<on::Trigger>::into)
     }
@@ -93,11 +93,7 @@ where
     where
         R: Repr,
     {
-        let mut from_str = OnStringParser;
-        let mut from_arr = OnArrayParser;
-        let mut from_map = OnMapParser(&mut self.0);
-
-        let mut rhs = OrParser::new(&mut from_arr, &mut from_map, &|r| {
+        let rhs = OrParser::new(OnArrayParser, OnMapParser(&mut self.0), |r| {
             PossumNodeKind::Invalid(
                 ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Seq, YamlKind::Map])
                     .but_found(r)
@@ -105,7 +101,7 @@ where
             )
         });
 
-        OrParser::new(&mut from_str, &mut rhs, &|r| {
+        OrParser::new(OnStringParser, rhs, |r| {
             PossumNodeKind::Invalid(
                 ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Seq, YamlKind::Map])
                     .but_found(r)

@@ -1,9 +1,9 @@
 use crate::document::Annotations;
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::ExpectedYaml;
-use crate::scavenge::parser::{
+use crate::scavenge::parsers::{
     BoolParser, Builder, FlatMapParser, NumberParser, ObjectParser, OrParser, SeqParser,
-    StringParser, TransformParser,
+    StringParser,  TransformableParser,
 };
 use crate::scavenge::yaml::YamlKind;
 use crate::scavenge::{Parser, UnexpectedKey};
@@ -43,8 +43,8 @@ where
         R: Repr,
     {
         FlatMapParser::new(
-            &mut StringParser,
-            &|s| match on::WorkflowInputType::fromstr(s.as_str()) {
+            StringParser,
+            |s| match on::WorkflowInputType::fromstr(s.as_str()) {
                 Ok(input_type) => PossumNodeKind::Value(input_type),
                 Err(_) => PossumNodeKind::Invalid(BadInputType::Unknown(s).to_string()),
             },
@@ -61,16 +61,15 @@ where
     where
         R: Repr,
     {
-        let mut strs = StringParser;
-        let mut bools = BoolParser;
-        let mut nums = NumberParser;
+        let strs = StringParser.map(on::WorkflowInputDefault::Str);
+        let bools = BoolParser.map(on::WorkflowInputDefault::Bool);
+        let nums = NumberParser.map(on::WorkflowInputDefault::Number);
 
         OrParser::new(
-            &mut TransformParser::new(&mut strs, &|s| on::WorkflowInputDefault::Str(s)),
-            &mut OrParser::new(
-                &mut TransformParser::new(&mut bools, &|b| on::WorkflowInputDefault::Bool(b)),
-                &mut TransformParser::new(&mut nums, &|n| on::WorkflowInputDefault::Number(n)),
-                &|r| {
+            strs,
+            OrParser::new(
+                bools, nums,
+            |r| {
                     PossumNodeKind::Invalid(
                         ExpectedYaml::AnyOf(vec![YamlKind::Number, YamlKind::Str, YamlKind::Bool])
                             .but_found(r)
@@ -78,7 +77,7 @@ where
                     )
                 },
             ),
-            &|r| {
+            |r| {
                 PossumNodeKind::Invalid(
                     ExpectedYaml::AnyOf(vec![YamlKind::Number, YamlKind::Str, YamlKind::Bool])
                         .but_found(r)
@@ -117,7 +116,7 @@ impl Builder<on::WorkflowInput> for InputBuilder {
             }
             "choices" => {
                 item.choices = Some(
-                    SeqParser::new(&mut StringParser)
+                    SeqParser::new(StringParser)
                         .parse_node(value)
                         .at(value),
                 );

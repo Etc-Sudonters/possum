@@ -12,8 +12,8 @@ use yaml_peg::Node as YamlNode;
 use super::Workflow;
 use crate::document::Annotations;
 use crate::scavenge::ast::PossumNodeKind;
-use crate::scavenge::parser::{Builder, ObjectParser, Parser, StringParser};
-use crate::scavenge::{MapParser, UnexpectedKey};
+use crate::scavenge::parsers::{Builder, MapParser, ObjectParser, StringParser};
+use crate::scavenge::{Parser, UnexpectedKey};
 
 pub struct WorkflowParser<'a> {
     annotations: &'a mut Annotations,
@@ -55,7 +55,7 @@ impl Builder<Workflow> for WorkflowBuilder {
             }
             "jobs" => {
                 item.jobs = Some(
-                    MapParser::new(&mut StringParser, &mut job::JobParser::new(annotations))
+                    MapParser::new(StringParser, job::JobParser::new(annotations))
                         .parse_node(value)
                         .at(value),
                 );

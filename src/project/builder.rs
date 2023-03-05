@@ -1,69 +1,26 @@
-use crate::document::Annotations;
-use crate::document::Document;
-use crate::scavenge::parse_single_document as possum_parse;
-use crate::scavenge::ParseFailure;
+use super::{Project, ProjectEntry, InitFailure};
+use crate::document::{Annotations, Document};
+use crate::scavenge::{parse_single_document as possum_parse, ParseFailure};
 use crate::workflow::WorkflowParser;
 use std::ffi::OsStr;
-use std::fmt::Display;
+use std::path::PathBuf;
 use yaml_peg::parser::Loader;
 use yaml_peg::repr::RcRepr;
+use super::ProjectRoot;
 
-use super::{InitFailures, Project, ProjectEntry};
-use std::path::PathBuf;
-
-#[derive(Clone, Debug)]
-pub enum ProjectRoot {
-    Explicit(PathBuf),
-    WorkingDirectory,
-}
-
-impl ProjectRoot {
-    fn path(&self) -> PathBuf {
-        match self {
-            ProjectRoot::Explicit(d) => d.to_owned(),
-            ProjectRoot::WorkingDirectory => std::env::current_dir().unwrap(),
-        }
-        .join(".github")
-        .join("workflows")
-    }
-
-    fn exists(&self) -> bool {
-        self.path().exists()
-    }
-
-    fn is_dir(&self) -> bool {
-        self.path().is_dir()
-    }
-}
-
-impl Into<PathBuf> for ProjectRoot {
-    fn into(self) -> PathBuf {
-        self.path().clone()
-    }
-}
-
-impl Display for ProjectRoot {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            ProjectRoot::WorkingDirectory => write!(f, "."),
-            ProjectRoot::Explicit(dir) => write!(f, "{}", dir.display()),
-        }
-    }
-}
-
-pub fn build(root: ProjectRoot) -> Result<Project, InitFailures> {
+pub fn build(root: ProjectRoot) -> Result<Project, InitFailure> {
     if !root.exists() {
-        return Err(InitFailures::DirectoryNotFound(root.path()));
+        Err(InitFailure::dir_not_found(&root))?;
     }
 
     if !root.is_dir() {
-        return Err(InitFailures::NotADirectory(root.path()));
+        Err(InitFailure::not_dir(&root))?;
     }
 
-    let workflows = get_all_workflows(root.path());
+    let workflows = get_all_workflows(&root);
 
     if workflows.is_empty() {
-        Err(InitFailures::NoWorkflows(root.path()))?;
+        Err(InitFailure::no_workflows(&root))?;
     }
 
     let mut project = Project::new(root);
@@ -88,8 +45,8 @@ pub fn build(root: ProjectRoot) -> Result<Project, InitFailures> {
                     }
                 }
             }
-            Err(_) => {
-                project.push(ProjectEntry::ParseFailure(p, ParseFailure::CouldntOpen));
+            Err(e) => {
+                project.push(ProjectEntry::ParseFailure(p, ParseFailure::CouldntOpen(e)));
             }
         }
     }
@@ -97,8 +54,8 @@ pub fn build(root: ProjectRoot) -> Result<Project, InitFailures> {
     Ok(project)
 }
 
-fn get_all_workflows(root: PathBuf) -> Vec<PathBuf> {
-    std::fs::read_dir(root)
+fn get_all_workflows(root: impl Into<PathBuf>) -> Vec<PathBuf> {
+    std::fs::read_dir(root.into())
         .unwrap()
         .map(|d| d.unwrap().path())
         .filter(|p| {

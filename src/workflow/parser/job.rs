@@ -3,9 +3,8 @@ use super::permissions::PermissionParser;
 use crate::document::{Annotations, AsDocumentPointer};
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
-use crate::scavenge::parser::{
-    Builder, ObjectParser, OrParser, Pluralize, SeqParser, StringMapParser, StringParser,
-    TransformParser,
+use crate::scavenge::parsers::{
+    Builder, ObjectParser, OrParser, Pluralize, SeqParser, StringMapParser, StringParser, NumberParser, BoolParser, TransformableParser
 };
 use crate::scavenge::yaml::YamlKind;
 use crate::scavenge::{Parser, UnexpectedKey};
@@ -47,7 +46,7 @@ where
     where
         R: Repr,
     {
-        TransformParser::new(&mut StringParser, &job::Environment::Bare).parse_node(root)
+        StringParser.map(job::Environment::Bare).parse_node(root)
     }
 }
 
@@ -102,7 +101,7 @@ impl Builder<job::Job> for JobBuilder {
         item: &mut job::Job,
         key: &str,
         value: &YamlNode<R>,
-        _: &P,
+        p: &P,
         annotations: &'a mut Annotations,
     ) where
         P: AsDocumentPointer,
@@ -132,7 +131,7 @@ impl Builder<job::Job> for JobBuilder {
             }
             "steps" => {
                 item.steps = Some(
-                    SeqParser::new(&mut StepParser::new(annotations))
+                    SeqParser::new(StepParser::new(annotations))
                         .parse_node(value)
                         .at(value),
                 );
@@ -140,9 +139,9 @@ impl Builder<job::Job> for JobBuilder {
             "environment" => {
                 item.environment = Some(
                     OrParser::new(
-                        &mut EnvStringParser,
-                        &mut EnvMapParser::new(annotations),
-                        &|r| {
+                        EnvStringParser,
+                        EnvMapParser::new(annotations),
+                        |r| {
                             Invalid(
                                 ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Map])
                                     .but_found(r)
@@ -160,9 +159,9 @@ impl Builder<job::Job> for JobBuilder {
             "needs" => {
                 item.needs = Some(
                     OrParser::new(
-                        &mut Pluralize::new(&mut StringParser),
-                        &mut SeqParser::new(&mut StringParser),
-                        &|unexpected| {
+                        Pluralize::new(StringParser),
+                        SeqParser::new(StringParser),
+                        |unexpected| {
                             Invalid(
                                 ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Seq])
                                     .but_found(unexpected)
@@ -180,9 +179,9 @@ impl Builder<job::Job> for JobBuilder {
             "runs-on" => {
                 item.runs_on = Some(
                     OrParser::new(
-                        &mut Pluralize::new(&mut StringParser),
-                        &mut SeqParser::new(&mut StringParser),
-                        &|unexpected| {
+                        Pluralize::new(StringParser),
+                        SeqParser::new(StringParser),
+                        |unexpected| {
                             Invalid(
                                 ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Seq])
                                     .but_found(unexpected)
@@ -198,19 +197,16 @@ impl Builder<job::Job> for JobBuilder {
                 item.outputs = Some(StringMapParser::new().parse_node(value).at(value));
             }
             "timeout-minutes" => {
-                let timeout: PossumNodeKind<f64> = value.extract_number().into();
-                item.timeout_minutes = Some(timeout.at(value));
+                item.timeout_minutes = Some(NumberParser.parse_node(value).at(value));
             }
             "continue-on-error" => {
-                let coe: PossumNodeKind<bool> = value.extract_bool().into();
-                item.continue_on_error = Some(coe.at(value));
+                item.continue_on_error = Some(BoolParser.parse_node(value).at(value));
             }
             "uses" => {
-                let uses: PossumNodeKind<String> =
-                    value.extract_str().map(ToOwned::to_owned).into();
-                item.uses = Some(uses.at(value));
+                item.uses = Some(StringParser.parse_node(value).at(value));
             }
-            s => panic!("unknown key inside job {s}"), //self.annotate(UnexpectedKey::from(s).at(p)),
+            "strategy" => {},
+            s => annotations.add(UnexpectedKey::from(s).at(p)),
         }
     }
 }

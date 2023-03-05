@@ -2,13 +2,13 @@ use super::input::InputParser;
 use crate::document::Annotations;
 use crate::document::AsDocumentPointer;
 use crate::scavenge::ast::PossumNodeKind;
-use crate::scavenge::parser::BoolParser;
-use crate::scavenge::parser::Builder;
-use crate::scavenge::parser::ObjectParser;
-use crate::scavenge::parser::SeqParser;
-use crate::scavenge::parser::StringParser;
-use crate::scavenge::parser::TransformParser;
-use crate::scavenge::MapParser;
+use crate::scavenge::parsers::BoolParser;
+use crate::scavenge::parsers::Builder;
+use crate::scavenge::parsers::MapParser;
+use crate::scavenge::parsers::ObjectParser;
+use crate::scavenge::parsers::SeqParser;
+use crate::scavenge::parsers::StringParser;
+use crate::scavenge::parsers::TransformParser;
 use crate::scavenge::{Parser, UnexpectedKey};
 use crate::workflow::on::{self, Globbed};
 use yaml_peg::repr::Repr;
@@ -54,7 +54,7 @@ impl Builder<on::Event> for EventBuilder {
         match key {
             "branches" => {
                 item.branches = Some(
-                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                    SeqParser::new(TransformParser::new(StringParser, Globbed::new))
                         .parse_node(value)
                         .at(value),
                 );
@@ -62,56 +62,56 @@ impl Builder<on::Event> for EventBuilder {
 
             "branches-ignore" => {
                 item.branches_ignore = Some(
-                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                    SeqParser::new(TransformParser::new(StringParser, Globbed::new))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "paths" => {
                 item.paths = Some(
-                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                    SeqParser::new(TransformParser::new(StringParser, Globbed::new))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "paths-ignore" => {
                 item.paths_ignore = Some(
-                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                    SeqParser::new(TransformParser::new(StringParser, Globbed::new))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "tags" => {
                 item.tags = Some(
-                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                    SeqParser::new(TransformParser::new(StringParser, Globbed::new))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "tags-ignore" => {
                 item.tags_ignore = Some(
-                    SeqParser::new(&mut TransformParser::new(&mut StringParser, &Globbed::new))
+                    SeqParser::new(TransformParser::new(StringParser, Globbed::new))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "inputs" => {
                 item.inputs = Some(
-                    MapParser::new(&mut StringParser, &mut InputParser::new(annotations))
+                    MapParser::new(StringParser, InputParser::new(annotations))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "outputs" => {
                 item.outputs = Some(
-                    MapParser::new(&mut StringParser, &mut WorkflowOutputParser(annotations))
+                    MapParser::new(StringParser, WorkflowOutputParser(annotations))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "secrets" => {
                 item.secrets = Some(
-                    MapParser::new(&mut StringParser, &mut InheritedSecretParser(annotations))
+                    MapParser::new(StringParser, InheritedSecretParser(annotations))
                         .parse_node(value)
                         .at(value),
                 );

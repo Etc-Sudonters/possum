@@ -1,5 +1,5 @@
 use crate::document::{Annotatable, Annotation, AsDocumentPointer};
-use crate::lint::Linter;
+use crate::lint::LintRule;
 use crate::scavenge::ast::{PossumMap, PossumNode};
 use crate::workflow::job::Job;
 
@@ -14,10 +14,8 @@ impl EmptyJobs {
     }
 }
 
-impl Linter<PossumMap<String, Job>> for EmptyJobs {
-    fn lint<A>(&self, root: &PossumNode<PossumMap<String, Job>>, annotations: &mut A)
-    where
-        A: Annotatable,
+impl LintRule<PossumMap<String, Job>> for EmptyJobs {
+    fn lint(&self, root: &PossumNode<PossumMap<String, Job>>, annotations: &mut impl Annotatable)
     {
         match root.value() {
             Some(j) if j.is_empty() => annotations.annotate(Self::at(root)),

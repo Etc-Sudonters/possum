@@ -49,7 +49,7 @@ impl<'a> Display for OneLineParseFailure<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let msg = match self.0 {
             ParseFailure::Empty => "document is empty".to_owned(),
-            ParseFailure::CouldntOpen => "could not open document".to_owned(),
+            ParseFailure::CouldntOpen(_) => "could not open document".to_owned(),
             ParseFailure::InvalidDocument(e) => e.to_string(),
             ParseFailure::TooManyDocuments(_) => "too many documents in file".to_owned(),
         };

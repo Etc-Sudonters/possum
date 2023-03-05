@@ -1,7 +1,10 @@
-use crate::{document::Annotatable, scavenge::ast::PossumNode};
+use crate::scavenge::ast::PossumNode;
+use crate::document::{Annotatable, AsDocumentPointer, Annotation};
 
-pub trait Linter<T> {
-    fn lint<A>(&self, root: &PossumNode<T>, annotations: &mut A)
-    where
-        A: Annotatable;
+pub trait LintRule<T> {
+    fn lint(&self, root: &PossumNode<T>, annotations: &mut impl Annotatable);
+}
+
+pub trait LintViolation {
+    fn at(&self, loc: &impl AsDocumentPointer) -> Annotation;
 }

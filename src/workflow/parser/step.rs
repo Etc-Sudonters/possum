@@ -6,7 +6,8 @@ use crate::{
     scavenge::{
         ast::PossumNodeKind,
         extraction::Extract,
-        parser::{Parser, StringMapParser, StringParser},
+        parser::Parser,
+        parsers::{StringMapParser, StringParser},
         Fallible, UnexpectedKey,
     },
     workflow::job,

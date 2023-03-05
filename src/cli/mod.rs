@@ -1,5 +1,5 @@
 pub mod render;
-use crate::project::builder::ProjectRoot;
+use crate::project::ProjectRoot;
 use clap::Parser;
 use std::error::Error;
 

@@ -64,10 +64,7 @@ impl<T> PossumNodeKind<T> {
         }
     }
 
-    pub fn map<U, F>(self, f: F) -> PossumNodeKind<U>
-    where
-        F: Fn(T) -> U,
-    {
+    pub fn map<U>(self, f: impl Fn(T) -> U) -> PossumNodeKind<U> {
         use PossumNodeKind::*;
         match self {
             Value(t) => Value(f(t)),
@@ -77,10 +74,7 @@ impl<T> PossumNodeKind<T> {
         }
     }
 
-    pub fn flatmap<U, F>(self, f: F) -> PossumNodeKind<U>
-    where
-        F: Fn(T) -> PossumNodeKind<U>,
-    {
+    pub fn flatmap<U>(self, f: impl Fn(T) -> PossumNodeKind<U>) -> PossumNodeKind<U> {
         use PossumNodeKind::*;
         match self {
             Value(t) => f(t),
@@ -90,10 +84,7 @@ impl<T> PossumNodeKind<T> {
         }
     }
 
-    pub fn recover<F>(self, mut f: F) -> PossumNodeKind<T>
-    where
-        F: FnMut() -> PossumNodeKind<T>,
-    {
+    pub fn recover(self, mut f: impl FnMut() -> PossumNodeKind<T>) -> PossumNodeKind<T> {
         use PossumNodeKind::*;
         match self {
             Value(t) => Value(t),
