@@ -4,12 +4,14 @@ use crate::document::{Annotations, AsDocumentPointer};
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
 use crate::scavenge::parsers::{
-    Builder, ObjectParser, OrParser, Pluralize, SeqParser, StringMapParser, StringParser, NumberParser, BoolParser, TransformableParser
+    BoolParser, Builder, NumberParser, ObjectParser, OrableParser, PluralizableParser, SeqParser,
+    StringMapParser, StringParser, TransformableParser,
 };
 use crate::scavenge::yaml::YamlKind;
 use crate::scavenge::{Parser, UnexpectedKey};
 use crate::workflow::job::{self, Job};
 use crate::workflow::parser::step::StepParser;
+use crate::workflow::parser::strategy::StrategyBuilder;
 use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
 
@@ -25,7 +27,7 @@ where
     where
         R: Repr,
     {
-        ObjectParser::new(JobBuilder, || job::Job::default(), &mut self.annotations)
+        ObjectParser::new(JobBuilder::default, &mut self.annotations)
             .parse_node(root)
     }
 }
@@ -46,7 +48,7 @@ where
     where
         R: Repr,
     {
-        StringParser.map(job::Environment::Bare).parse_node(root)
+        StringParser.to(job::Environment::Bare).parse_node(root)
     }
 }
 
@@ -93,119 +95,121 @@ where
     }
 }
 
-struct JobBuilder;
+#[derive(Default)]
+struct JobBuilder {
+    job: job::Job,
+}
+
+impl Into<job::Job> for JobBuilder {
+    fn into(self) -> job::Job {
+       self.job
+    }
+}
 
 impl Builder<job::Job> for JobBuilder {
     fn build<'a, P, R>(
         &mut self,
-        item: &mut job::Job,
         key: &str,
         value: &YamlNode<R>,
         p: &P,
         annotations: &'a mut Annotations,
     ) where
-        P: AsDocumentPointer,
+        P: AsDocumentPointer + 'a,
         R: Repr,
     {
         use PossumNodeKind::*;
         match key {
             "permissions" => {
-                item.permissions = Some(
+                self.job.permissions = Some(
                     PermissionParser::new(annotations)
                         .parse_node(value)
                         .at(value),
                 );
             }
             "env" => {
-                item.env = Some(StringMapParser::new().parse_node(value).at(value));
+                self.job.env = Some(StringMapParser::new().parse_node(value).at(value));
             }
             "with" => {
-                item.with = Some(StringMapParser::new().parse_node(value).at(value));
+                self.job.with = Some(StringMapParser::new().parse_node(value).at(value));
             }
             "concurrency" => {
-                item.concurrency = Some(
+                self.job.concurrency = Some(
                     ConcurrencyParser::new(annotations)
                         .parse_node(value)
                         .at(value),
                 );
             }
             "steps" => {
-                item.steps = Some(
+                self.job.steps = Some(
                     SeqParser::new(StepParser::new(annotations))
                         .parse_node(value)
                         .at(value),
                 );
             }
             "environment" => {
-                item.environment = Some(
-                    OrParser::new(
-                        EnvStringParser,
-                        EnvMapParser::new(annotations),
-                        |r| {
-                            Invalid(
+                self.job.environment = Some(
+                    EnvStringParser
+                        .or(EnvMapParser::new(annotations), |r| {
+                            PossumNodeKind::invalid(
                                 ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Map])
-                                    .but_found(r)
-                                    .to_string(),
+                                    .but_found(r),
                             )
-                        },
-                    )
-                    .parse_node(value)
-                    .at(value),
+                        })
+                        .parse_node(value)
+                        .at(value),
                 );
             }
             "name" => {
-                item.name = Some(StringParser.parse_node(value).at(value));
+                self.job.name = Some(StringParser.parse_node(value).at(value));
             }
             "needs" => {
-                item.needs = Some(
-                    OrParser::new(
-                        Pluralize::new(StringParser),
-                        SeqParser::new(StringParser),
-                        |unexpected| {
+                self.job.needs = Some(
+                    StringParser
+                        .pluralize()
+                        .or(SeqParser::new(StringParser), |unexpected| {
                             Invalid(
                                 ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Seq])
                                     .but_found(unexpected)
                                     .to_string(),
                             )
-                        },
-                    )
-                    .parse_node(value)
-                    .at(value),
+                        })
+                        .parse_node(value)
+                        .at(value),
                 )
             }
             "if" => {
-                item.cond = Some(StringParser.parse_node(value).at(value));
+                self.job.cond = Some(StringParser.parse_node(value).at(value));
             }
             "runs-on" => {
-                item.runs_on = Some(
-                    OrParser::new(
-                        Pluralize::new(StringParser),
-                        SeqParser::new(StringParser),
-                        |unexpected| {
+                self.job.runs_on = Some(
+                    StringParser
+                        .pluralize()
+                        .or(SeqParser::new(StringParser), |unexpected| {
                             Invalid(
                                 ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Seq])
                                     .but_found(unexpected)
                                     .to_string(),
                             )
-                        },
-                    )
-                    .parse_node(value)
-                    .at(value),
+                        })
+                        .parse_node(value)
+                        .at(value),
                 );
             }
             "outputs" => {
-                item.outputs = Some(StringMapParser::new().parse_node(value).at(value));
+                self.job.outputs = Some(StringMapParser::new().parse_node(value).at(value));
             }
             "timeout-minutes" => {
-                item.timeout_minutes = Some(NumberParser.parse_node(value).at(value));
+                self.job.timeout_minutes = Some(NumberParser.parse_node(value).at(value));
             }
             "continue-on-error" => {
-                item.continue_on_error = Some(BoolParser.parse_node(value).at(value));
+                self.job.continue_on_error = Some(BoolParser.parse_node(value).at(value));
             }
             "uses" => {
-                item.uses = Some(StringParser.parse_node(value).at(value));
+                self.job.uses = Some(StringParser.parse_node(value).at(value));
             }
-            "strategy" => {},
+            "strategy" => {
+                self.job.strategy = Some(ObjectParser::new(StrategyBuilder::default, annotations).parse_node(value).at(value));
+            }
             s => annotations.add(UnexpectedKey::from(s).at(p)),
         }
     }

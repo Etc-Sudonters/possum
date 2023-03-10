@@ -56,7 +56,7 @@ where
     P: Parser<R, T>,
     F: Fn(T) -> U,
 {
-    fn map(self, f: F) -> TransformParser<R, T, U, P, F>;
+    fn to(self, f: F) -> TransformParser<R, T, U, P, F>;
 }
 
 impl<R, T, U, P, F> TransformableParser<R, T, U, P, F> for P
@@ -65,7 +65,7 @@ where
     P: Parser<R, T>,
     F: Fn(T) -> U,
 {
-    fn map(self, f: F) -> TransformParser<R, T, U, P, F> {
+    fn to(self, f: F) -> TransformParser<R, T, U, P, F> {
         TransformParser::new(self, f)
     }
 }
@@ -113,6 +113,8 @@ where
     }
 }
 
+// Pluralize parses a _single_ T into a sequence of T.
+// For parsing a sequence of T, see SeqParser
 pub struct Pluralize<R, T, P>
 where
     R: Repr,
@@ -147,5 +149,43 @@ where
         R: Repr,
     {
         PossumNodeKind::Value(self.inner.parse_node(root).at(root).into())
+    }
+}
+
+pub trait PluralizableParser<R, T, P>
+where
+    R: Repr,
+    P: Parser<R, T>,
+{
+    fn pluralize(self) -> Pluralize<R, T, P>;
+}
+
+impl<R, T, P> PluralizableParser<R, T, P> for P
+where
+    R: Repr,
+    P: Parser<R, T>,
+{
+    fn pluralize(self) -> Pluralize<R, T, P> {
+        Pluralize::new(self)
+    }
+}
+
+pub trait FlatMappableParser<R, T, U, P, F>
+where
+    R: Repr,
+    P: Parser<R, T>,
+    F: Fn(T) -> PossumNodeKind<U>,
+{
+    fn flatten(self, transform: F) -> FlatMapParser<R, T, U, P, F>;
+}
+
+impl<R, T, U, P, F> FlatMappableParser<R, T, U, P, F> for P
+where
+    R: Repr,
+    P: Parser<R, T>,
+    F: Fn(T) -> PossumNodeKind<U>,
+{
+    fn flatten(self, transform: F) -> FlatMapParser<R, T, U, P, F> {
+        FlatMapParser::new(self, transform)
     }
 }

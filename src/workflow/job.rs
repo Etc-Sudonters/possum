@@ -55,14 +55,14 @@ possum_node_type!(
     }
 );
 
-possum_node_type!(
-    #[derive(Debug, Default)]
-    struct Matrix {
-        entries: PossumMap<String, PossumSeq<MatrixInput>>,
-        include: PossumSeq<PossumMap<String, MatrixInput>>,
-        exclude: PossumSeq<PossumMap<String, MatrixInput>>,
-    }
-);
+// Matrix has include and exclude embedded within the map itself, for some reason
+// that means we can't use possum_node_type! here because entries isn't actually a node itself
+#[derive(Debug, Default)]
+pub struct Matrix {
+    pub entries: PossumMap<String, PossumSeq<MatrixInput>>,
+    pub include: Option<PossumNode<PossumSeq<PossumMap<String, MatrixInput>>>>,
+    pub exclude: Option<PossumNode<PossumSeq<PossumMap<String, MatrixInput>>>>,
+}
 
 #[derive(Debug)]
 pub enum MatrixInput {

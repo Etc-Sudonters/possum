@@ -16,7 +16,7 @@ impl Trigger {
 
     pub fn add_event_name(&mut self, kind: PossumNode<EventKind>) {
         let loc = kind.loc();
-        self.add_event(kind, PossumNodeKind::Empty.at(loc));
+        self.add_event(kind, PossumNodeKind::Empty.at(&loc));
     }
 }
 

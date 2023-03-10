@@ -1,7 +1,7 @@
 use crate::document::{Annotation, Annotations};
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::{ExpectedYaml, Extract};
-use crate::scavenge::parsers::{OrParser, StringParser,  TransformableParser};
+use crate::scavenge::parsers::{OrableParser, StringParser, TransformableParser};
 use crate::scavenge::yaml::YamlKind;
 use crate::scavenge::{Parser, UnexpectedKey};
 use crate::workflow::Concurrency;
@@ -25,18 +25,14 @@ where
     where
         R: Repr,
     {
-        OrParser::new(
-            ConcurrencyStringParser,
-            ConcurrencyMapParser(self.0),
-            |root| {
-                PossumNodeKind::Invalid(
+        ConcurrencyStringParser
+            .or(ConcurrencyMapParser(self.0), |root| {
+                PossumNodeKind::invalid(
                     ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Map])
                         .but_found(root)
-                        .to_string(),
                 )
-            },
-        )
-        .parse_node(root)
+            })
+            .parse_node(root)
     }
 }
 
@@ -57,7 +53,9 @@ where
     where
         R: Repr,
     {
-        StringParser.map(|s| Concurrency::Concurrency(s)).parse_node(root)
+        StringParser
+            .to(|s| Concurrency::Concurrency(s))
+            .parse_node(root)
     }
 }
 

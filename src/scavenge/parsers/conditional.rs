@@ -1,10 +1,9 @@
 use super::concrete::ExprParser;
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::parser::Parser;
+use std::marker::PhantomData;
 use yaml_peg::repr::Repr;
 use yaml_peg::Node as YamlNode;
-use std::marker::PhantomData;
-
 
 pub struct OrParser<R, T, LHS, RHS, D>
 where
@@ -28,7 +27,13 @@ where
     D: Fn(&YamlNode<R>) -> PossumNodeKind<T>,
 {
     pub fn new(lhs: LHS, rhs: RHS, default: D) -> OrParser<R, T, LHS, RHS, D> {
-        OrParser { lhs, rhs, default, _r: PhantomData, _t: PhantomData }
+        OrParser {
+            lhs,
+            rhs,
+            default,
+            _r: PhantomData,
+            _t: PhantomData,
+        }
     }
 }
 
@@ -54,11 +59,11 @@ pub struct MaybeExprParser<R, T, RHS, D>
 where
     R: Repr,
     RHS: Parser<R, T>,
-    D: Fn(&YamlNode<R>) -> PossumNodeKind<T>
-    {
-inner: OrParser<R, T, ExprParser<T>, RHS, D>,
-_m: PhantomData<R>,
-    }
+    D: Fn(&YamlNode<R>) -> PossumNodeKind<T>,
+{
+    inner: OrParser<R, T, ExprParser<T>, RHS, D>,
+    _m: PhantomData<R>,
+}
 
 impl<R, T, RHS, D> MaybeExprParser<R, T, RHS, D>
 where
@@ -66,12 +71,9 @@ where
     RHS: Parser<R, T>,
     D: Fn(&YamlNode<R>) -> PossumNodeKind<T>,
 {
-    pub fn new(
-        inner: RHS,
-        default: D,
-    ) -> MaybeExprParser<R, T,  RHS, D> {
+    pub fn new(inner: RHS, default: D) -> MaybeExprParser<R, T, RHS, D> {
         MaybeExprParser {
-            inner:OrParser::new(ExprParser::new(), inner, default),
+            inner: ExprParser::new().or(inner, default),
             _m: PhantomData,
         }
     }
@@ -81,12 +83,34 @@ impl<R, T, RHS, D> Parser<R, T> for MaybeExprParser<R, T, RHS, D>
 where
     R: Repr,
     RHS: Parser<R, T>,
-    D: Fn(&YamlNode<R>) -> PossumNodeKind<T>
+    D: Fn(&YamlNode<R>) -> PossumNodeKind<T>,
 {
     fn parse_node(&mut self, root: &YamlNode<R>) -> PossumNodeKind<T>
     where
         R: Repr,
     {
         self.inner.parse_node(root)
+    }
+}
+
+pub trait OrableParser<R, T, LHS, RHS, D>
+where
+    R: Repr,
+    LHS: Parser<R, T>,
+    RHS: Parser<R, T>,
+    D: Fn(&YamlNode<R>) -> PossumNodeKind<T>,
+{
+    fn or(self, rhs: RHS, default: D) -> OrParser<R, T, LHS, RHS, D>;
+}
+
+impl<R, T, LHS, RHS, D> OrableParser<R, T, LHS, RHS, D> for LHS
+where
+    R: Repr,
+    LHS: Parser<R, T>,
+    RHS: Parser<R, T>,
+    D: Fn(&YamlNode<R>) -> PossumNodeKind<T>,
+{
+    fn or(self, rhs: RHS, default: D) -> OrParser<R, T, LHS, RHS, D> {
+        OrParser::new(self, rhs, default)
     }
 }

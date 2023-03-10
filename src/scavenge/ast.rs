@@ -27,6 +27,20 @@ impl<T> PossumNode<T> {
             _ => None,
         }
     }
+
+    pub fn map<F, U>(self, f: F) -> PossumNode<U>
+    where
+        F: Fn(T) -> U,
+    {
+        self.kind.map(f).at(&self.location)
+    }
+
+    pub fn flatmap<F, U>(self, f: F) -> PossumNode<U>
+    where
+        F: Fn(T) -> PossumNodeKind<U>,
+    {
+        self.kind.flatmap(f).at(&self.location)
+    }
 }
 
 impl<T> AsDocumentPointer for &PossumNode<T> {
@@ -50,18 +64,15 @@ pub enum PossumNodeKind<T> {
 }
 
 impl<T> PossumNodeKind<T> {
-    pub fn at<D>(self, location: D) -> PossumNode<T>
+    pub fn at<D>(self, location: &D) -> PossumNode<T>
     where
         D: AsDocumentPointer,
     {
         PossumNode::new(location.as_document_pointer(), self)
     }
 
-    pub fn invalid(&self) -> bool {
-        match self {
-            PossumNodeKind::Invalid(_) => true,
-            _ => false,
-        }
+    pub fn invalid(msg: impl ToString) -> PossumNodeKind<T> {
+        PossumNodeKind::Invalid(msg.to_string())
     }
 
     pub fn map<U>(self, f: impl Fn(T) -> U) -> PossumNodeKind<U> {
@@ -99,6 +110,12 @@ impl<T> PossumNodeKind<T> {
 pub struct PossumMap<K, V> {
     keys: PossumSeq<K>,
     values: PossumSeq<V>,
+}
+
+impl<K, V> Default for PossumMap<K, V> {
+    fn default() -> Self {
+        Self::empty()
+    }
 }
 
 impl<K, V> PossumMap<K, V> {

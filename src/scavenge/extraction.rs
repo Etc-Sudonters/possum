@@ -82,6 +82,7 @@ impl IntoYamlKind for YamlKind {
 pub enum ExpectedYaml {
     Only(YamlKind),
     AnyOf(Vec<YamlKind>),
+    SeqOf(Box<ExpectedYaml>),
 }
 
 impl ExpectedYaml {
@@ -101,6 +102,7 @@ impl PartialEq<YamlKind> for ExpectedYaml {
         match self {
             Self::Only(y) => y == other,
             Self::AnyOf(ys) => ys.contains(other),
+            Self::SeqOf(ys) => ys.eq(other),
         }
     }
 }
@@ -109,8 +111,22 @@ impl Display for ExpectedYaml {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Only(o) => write!(f, "{}", o),
-            Self::AnyOf(these) => write!(f, "{:?}", these),
+            Self::AnyOf(these) => write!(
+                f,
+                "AnyOf({})",
+                these
+                    .iter()
+                    .map(|o| format!("{}, ", o))
+                    .collect::<String>()
+            ),
+            Self::SeqOf(these) => write!(f, "SeqOf({})", these),
         }
+    }
+}
+
+impl Into<String> for ExpectedYaml {
+    fn into(self) -> String {
+        self.to_string()
     }
 }
 

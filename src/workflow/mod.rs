@@ -16,6 +16,7 @@ possum_node_type! {
         jobs: PossumMap<String, job::Job>,
         permissions: Permission,
         concurrency: Concurrency,
+        env: PossumMap<String, String>,
     }
 }
 

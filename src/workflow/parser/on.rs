@@ -3,7 +3,7 @@ use crate::document::Annotations;
 use crate::scavenge::ast::PossumNodeKind;
 use crate::scavenge::extraction::ExpectedYaml;
 use crate::scavenge::parsers::{
-    FlatMapParser, MapParser, OrParser, SeqParser, StringParser, TransformParser,
+    FlatMappableParser, MapParser, OrableParser, SeqParser, StringParser, TransformableParser,
 };
 use crate::scavenge::yaml::YamlKind;
 use crate::scavenge::Parser;
@@ -32,14 +32,12 @@ where
     where
         R: Repr,
     {
-        FlatMapParser::new(
-            StringParser,
-            |s| match EventKind::fromstr(s.as_str()) {
+        StringParser
+            .flatten(|s| match EventKind::fromstr(s.as_str()) {
                 Ok(ek) => PossumNodeKind::Value(ek),
                 Err(_) => PossumNodeKind::Invalid(BadEvent::Unknown(s).to_string()),
-            },
-        )
-        .parse_node(root)
+            })
+            .parse_node(root)
     }
 }
 
@@ -63,11 +61,9 @@ where
     where
         R: Repr,
     {
-        TransformParser::new(
-            SeqParser::new(EventKindParser),
-            Into::<on::Trigger>::into,
-        )
-        .parse_node(root)
+        SeqParser::new(EventKindParser)
+            .to(Into::<on::Trigger>::into)
+            .parse_node(root)
     }
 }
 
@@ -93,21 +89,21 @@ where
     where
         R: Repr,
     {
-        let rhs = OrParser::new(OnArrayParser, OnMapParser(&mut self.0), |r| {
-            PossumNodeKind::Invalid(
-                ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Seq, YamlKind::Map])
-                    .but_found(r)
-                    .to_string(),
-            )
-        });
-
-        OrParser::new(OnStringParser, rhs, |r| {
-            PossumNodeKind::Invalid(
-                ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Seq, YamlKind::Map])
-                    .but_found(r)
-                    .to_string(),
-            )
-        })
-        .parse_node(root)
+        OnArrayParser
+            .or(OnMapParser(&mut self.0), |r| {
+                PossumNodeKind::Invalid(
+                    ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Seq, YamlKind::Map])
+                        .but_found(r)
+                        .to_string(),
+                )
+            })
+            .or(OnStringParser, |r| {
+                PossumNodeKind::Invalid(
+                    ExpectedYaml::AnyOf(vec![YamlKind::Str, YamlKind::Seq, YamlKind::Map])
+                        .but_found(r)
+                        .to_string(),
+                )
+            })
+            .parse_node(root)
     }
 }
